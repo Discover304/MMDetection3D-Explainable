@@ -39,8 +39,6 @@ Documentation: https://mmdetection3d.readthedocs.io/
 
 ## Introduction
 
-English | [简体中文](README_zh-CN.md)
-
 The master branch works with **PyTorch 1.3+**.
 
 MMDetection3D is an open source object detection toolbox based on PyTorch, towards the next-generation platform for general 3D detection. It is
