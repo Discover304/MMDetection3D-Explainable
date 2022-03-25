@@ -1,3 +1,4 @@
+# 需要修改的配置文件
 _base_ = ['../_base_/schedules/cosine.py', '../_base_/default_runtime.py']
 
 # model settings
@@ -5,7 +6,7 @@ voxel_size = [0.05, 0.05, 0.1]
 point_cloud_range = [0, -40, -3, 70.4, 40, 1]
 
 model = dict(
-    type='DynamicMVXFasterRCNN',
+    type='DynamicMVXFasterRCNNDev',
     img_backbone=dict(
         type='ResNet',
         depth=50,
@@ -27,7 +28,7 @@ model = dict(
         max_voxels=(-1, -1),
     ),
     pts_voxel_encoder=dict(
-        type='DynamicVFE',
+        type='DynamicVFEDev',
         in_channels=4,
         feat_channels=[64, 64],
         with_distance=False,
@@ -35,24 +36,15 @@ model = dict(
         with_cluster_center=True,
         with_voxel_center=True,
         point_cloud_range=point_cloud_range,
-        fusion_layer=dict(
-            type='PointFusion',
-            img_channels=256,
-            pts_channels=64,
-            mid_channels=128,
-            out_channels=128,
-            img_levels=[0, 1, 2, 3, 4],
-            align_corners=False,
-            activate_out=True,
-            fuse_out=False)),
+        ),
     pts_middle_encoder=dict(
         type='SparseEncoder',
-        in_channels=128,
+        in_channels=64,
         sparse_shape=[41, 1600, 1408],
         order=('conv', 'norm', 'act')),
     pts_backbone=dict(
         type='SECOND',
-        in_channels=256,
+        in_channels=128,
         layer_nums=[5, 5],
         layer_strides=[1, 2],
         out_channels=[128, 256]),
@@ -61,6 +53,11 @@ model = dict(
         in_channels=[128, 256],
         upsample_strides=[1, 2],
         out_channels=[256, 256]),
+    fusion_layer=dict(
+        type='FusionDev',
+        img_channels=256,
+        pts_channels=256,
+        out_channels=256),
     pts_bbox_head=dict(
         type='Anchor3DHead',
         num_classes=3,
