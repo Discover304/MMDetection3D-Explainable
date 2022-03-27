@@ -42,7 +42,7 @@ model = dict(
     # 图像特征提取 Image Feature Extraction
     img_backbone=dict(
         type='ResNet',
-        depth=50,
+        depth=18,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
@@ -51,7 +51,7 @@ model = dict(
         style='caffe'),
     img_neck=dict(
         type='FPN',
-        in_channels=[256, 512, 1024, 2048],
+        in_channels=[64, 128, 256, 512],
         out_channels=256,
         num_outs=5),
 

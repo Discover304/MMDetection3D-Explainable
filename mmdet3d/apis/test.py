@@ -5,8 +5,7 @@ import mmcv
 import torch
 from mmcv.image import tensor2imgs
 
-from mmdet3d.models import (Base3DDetector, Base3DSegmentor,
-                            SingleStageMono3DDetector)
+from mmdet3d.models import Base3DDetector
 
 
 def single_gpu_test(model,
@@ -42,8 +41,7 @@ def single_gpu_test(model,
         if show:
             # Visualize the results of MMDetection3D model
             # 'show_results' is MMdetection3D visualization API
-            models_3d = (Base3DDetector, Base3DSegmentor,
-                         SingleStageMono3DDetector)
+            models_3d = (Base3DDetector,)
             if isinstance(model.module, models_3d):
                 model.module.show_results(
                     data,
