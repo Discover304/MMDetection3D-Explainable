@@ -13,13 +13,13 @@ Collections:
       Title: 'MVX-Net: Multimodal VoxelNet for 3D Object Detection'
     README: configs/mvxnet/README.md
     Code:
-      URL: https://github.com/open-mmlab/mmdetection3d/blob/master/mmdet3d/models/detectors/mvx_two_stage.py#L20
+      URL: https://github.com/open-mmlab/mmdetection3d/blob/master/mmdet3d/models/detectors/x_net.py#L20
       Version: v0.5.0
 
 Models:
   - Name: dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class
     In Collection: MVX-Net
-    Config: configs/mvxnet/xnet_model_type_kitti-3d-3class.py
+    Config: configs/mvxnet/xnet_model_Voxel_SECOND_ResNet_Fusion_kitti-3d-car.py
     Metadata:
       Training Memory (GB): 6.7
     Results:

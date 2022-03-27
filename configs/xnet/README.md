@@ -23,7 +23,7 @@ We implement Xnet and provide its results and models on KITTI dataset.
 |  Backbone   |Class| Lr schd | Mem (GB) | Inf time (fps) | mAP | Download |
 | :---------: | :-----: | :------: | :------------: | :----: |:----: | :------: |
 
-<!-- |    [SECFPN](./xnet_model_type_kitti-3d-3class.py)|3 Class|cosine 80e|6.7||63.0|[model](https://download.openmmlab.com/mmdetection3d/v0.1.0_models/mvxnet/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class_20200621_003904-10140f2d.pth) &#124; [log](https://download.openmmlab.com/mmdetection3d/v0.1.0_models/mvxnet/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class_20200621_003904.log.json)| -->
+<!-- |    [SECFPN](./xnet_model_Voxel_SECOND_ResNet_Fusion_kitti-3d-car.py)|3 Class|cosine 80e|6.7||63.0|[model](https://download.openmmlab.com/mmdetection3d/v0.1.0_models/mvxnet/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class_20200621_003904-10140f2d.pth) &#124; [log](https://download.openmmlab.com/mmdetection3d/v0.1.0_models/mvxnet/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class/dv_mvx-fpn_second_secfpn_adamw_2x8_80e_kitti-3d-3class_20200621_003904.log.json)| -->
 
 ## Citation
 

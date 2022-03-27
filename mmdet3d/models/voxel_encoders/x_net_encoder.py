@@ -10,6 +10,7 @@ from .. import builder
 from ..builder import VOXEL_ENCODERS
 from .utils import VFELayer, get_paddings_indicator
 
+# 信源编码
 @VOXEL_ENCODERS.register_module()
 class DynamicVFEDev(nn.Module):
     """Dynamic Voxel feature encoder used in DV-SECOND.
