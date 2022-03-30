@@ -72,8 +72,14 @@ python tools/train.py configs/xnet/xnet_model_Voxel_SECOND_ResNet_Fusion_kitti-3
 
 ![](https://image.discover304.top/blog-img/s11251303302022-2022330112513.png)
 
-训练baseline
-1.
+参考：[【AI框架】MMDetection3D 使用指南](https://blog.csdn.net/Discover304/article/details/123658140)
+
+```bash
+# 单卡训练：
+python tools/train.py ${CONFIG_FILE} [optional arguments]
+
+# 指定显卡训练：
+CUDA_VISIBLE_DEVICES=0,1,2,3 ./tools/dist_train.sh ${CONFIG_FILE} 4
 ```
 
-```
+注：对于多显卡训练，需要确保每一个
