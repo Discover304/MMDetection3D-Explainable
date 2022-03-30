@@ -109,7 +109,7 @@ class XNet(Base3DDetector):
     def with_fusion(self):
         """bool: Whether the detector has a fusion layer."""
         return hasattr(self,
-                       'pts_fusion_layer') and self.fusion_layer is not None
+                       'fusion_layer') and self.fusion_layer is not None
 
     @property
     def with_img_neck(self):
@@ -130,18 +130,6 @@ class XNet(Base3DDetector):
     def with_img_roi_head(self):
         """bool: Whether the detector has a RoI Head in image branch."""
         return hasattr(self, 'img_roi_head') and self.img_roi_head is not None
-
-    @property
-    def with_voxel_encoder(self):
-        """bool: Whether the detector has a voxel encoder."""
-        return hasattr(self,
-                       'voxel_encoder') and self.voxel_encoder is not None
-
-    @property
-    def with_middle_encoder(self):
-        """bool: Whether the detector has a middle encoder."""
-        return hasattr(self,
-                       'middle_encoder') and self.middle_encoder is not None
 
     def extract_img_feat(self, img, img_metas):
         """Extract features of images."""
@@ -164,13 +152,11 @@ class XNet(Base3DDetector):
         return img_feats
 
     def extract_pts_feat(self, points):
-        """Extract point features."""
-        if not self.with_pts_bbox:
-            return None
-        voxels, coors = self.voxelize(points)
-        voxel_feats, feature_coors = self.pts_voxel_encoder(voxels, coors, points)
-        batch_size = coors[-1, 0] + 1
-        x = self.pts_middle_encoder(voxel_feats, feature_coors, batch_size)
+        """Extract features from points."""
+        voxels, num_points, coors = self.voxelize(points)
+        voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
+        batch_size = coors[-1, 0].item() + 1
+        x = self.pts_middle_encoder(voxel_features, coors, batch_size)
         x = self.pts_backbone(x)
         if self.with_pts_neck:
             x = self.pts_neck(x)
@@ -180,32 +166,27 @@ class XNet(Base3DDetector):
         """Extract features from images and points."""
         img_feats = self.extract_img_feat(img, img_metas)
         pts_feats = self.extract_pts_feat(points)
-        pts_feats, img_feats = self.fusion_layer(pts_feats, img_feats)
+        img_feats, pts_feats = self.fusion_layer(img_feats, pts_feats)
         return (img_feats, pts_feats)
 
     @torch.no_grad()
     @force_fp32()
     def voxelize(self, points):
-        """Apply dynamic voxelization to points.
-
-        Args:
-            points (list[torch.Tensor]): Points of each sample.
-
-        Returns:
-            tuple[torch.Tensor]: Concatenated points and coordinates.
-        """
-        coors = []
-        # dynamic voxelization only provide a coors mapping
+        """Apply hard voxelization to points."""
+        voxels, coors, num_points = [], [], []
         for res in points:
-            res_coors = self.pts_voxel_layer(res)
+            res_voxels, res_coors, res_num_points = self.pts_voxel_layer(res)
+            voxels.append(res_voxels)
             coors.append(res_coors)
-        points = torch.cat(points, dim=0)
+            num_points.append(res_num_points)
+        voxels = torch.cat(voxels, dim=0)
+        num_points = torch.cat(num_points, dim=0)
         coors_batch = []
         for i, coor in enumerate(coors):
             coor_pad = F.pad(coor, (1, 0), mode='constant', value=i)
             coors_batch.append(coor_pad)
         coors_batch = torch.cat(coors_batch, dim=0)
-        return points, coors_batch
+        return voxels, num_points, coors_batch
 
     def forward_train(self,
                       points=None,

@@ -1,283 +1,79 @@
-<div align="center">
-  <img src="resources/mmdet3d-logo.png" width="600"/>
-  <div>&nbsp;</div>
-  <div align="center">
-    <b><font size="5">OpenMMLab website</font></b>
-    <sup>
-      <a href="https://openmmlab.com">
-        <i><font size="4">HOT</font></i>
-      </a>
-    </sup>
-    &nbsp;&nbsp;&nbsp;&nbsp;
-    <b><font size="5">OpenMMLab platform</font></b>
-    <sup>
-      <a href="https://platform.openmmlab.com">
-        <i><font size="4">TRY IT OUT</font></i>
-      </a>
-    </sup>
-  </div>
-  <div>&nbsp;</div>
-</div>
+# XNet
 
-[![docs](https://img.shields.io/badge/docs-latest-blue)](https://mmdetection3d.readthedocs.io/en/latest/)
-[![badge](https://github.com/open-mmlab/mmdetection3d/workflows/build/badge.svg)](https://github.com/open-mmlab/mmdetection3d/actions)
-[![codecov](https://codecov.io/gh/open-mmlab/mmdetection3d/branch/master/graph/badge.svg)](https://codecov.io/gh/open-mmlab/mmdetection3d)
-[![license](https://img.shields.io/github/license/open-mmlab/mmdetection3d.svg)](https://github.com/open-mmlab/mmdetection3d/blob/master/LICENSE)
+## 待办清单：
 
+- 网络整体：[x_net.py](mmdet3d/models/detectors/x_net.py)
+- 特征融合网络层：[x_net_fusion_layers.py](mmdet3d/models/fusion_layers/x_net_fusion_layers.py)
+- 网络配置文件：[xnet](configs/xnet)
 
-**News**: We released the codebase v1.0.0rc0.
+## 开发日志：
 
-Note: We are going through large refactoring to provide simpler and more unified usage of many modules.
+---
+### 日志01
 
-The compatibilities of models are broken due to the unification and simplification of coordinate systems. For now, most models are benchmarked with similar performance, though few models are still being benchmarked.
+使用pycharm的SSH连接docker，不如设置pycharm的编译器为docker中的python。这样做的优势有三：
 
-In the [nuScenes 3D detection challenge](https://www.nuscenes.org/object-detection?externalData=all&mapData=all&modalities=Any) of the 5th AI Driving Olympics in NeurIPS 2020, we obtained the best PKL award and the second runner-up by multi-modality entry, and the best vision-only results.
+1. 不需要通过ssh传输图像，pycharm的运行速度更快。
+2. 因为docker同步了工作目录，不需要使用pycharm来同步，节省时间。
+3. 不需要重新弄配置pycharm。
 
-Code and models for the best vision-only method, [FCOS3D](https://arxiv.org/abs/2104.10956), have been released. Please stay tuned for [MoCa](https://arxiv.org/abs/2012.12741).
+需要修改的有两个位置，一个是configs中的配置文件，一个是mmdet3d中的models相关文件。参照官方教程：[教程 1: 学习配置文件](https://mmdetection3d.readthedocs.io/zh_CN/latest/tutorials/config.html)和[教程 4: 自定义模型](https://mmdetection3d.readthedocs.io/zh_CN/latest/tutorials/customize_models.html)
 
-Documentation: https://mmdetection3d.readthedocs.io/
+整个框架的思路是从配置文件中去找对应的模型，程序会在一开始把模型全部注册到一个位置，然后使用配置文件中的type关键字去搜索，然后使用其他的作为参数输入，具体需要什么参数由模型决定。
 
-## Introduction
+阅读代码的时候发现，框架对自编码器有一定的支持，这一点在完成主干网络的构建后深入调查一下。
 
-The master branch works with **PyTorch 1.3+**.
+---
+### 日志02
 
-MMDetection3D is an open source object detection toolbox based on PyTorch, towards the next-generation platform for general 3D detection. It is
-a part of the OpenMMLab project developed by [MMLab](http://mmlab.ie.cuhk.edu.hk/).
+> ~~注意到代码中 fusion layer 本来是分出来的，但是因为代码复用的问题，实际上并没有分出来，导致变量冗余。我们对代码进行重构，在完成图像和点云特征提取后再使用 fusion layer 合并。~~
 
-![demo image](resources/mmdet3d_outdoor_demo.gif)
+上述问题描述并不正确，这样的结构不仅仅是因为代码复用，也是因为分析的MVX-Net的模型的结构。MVX-Net是一个数据级融合，需要对齐点云和图像数据，然后将图像的数据提炼（降维），然后将提炼后的数据补充到点云数据上，最后进入检测主干网络（这里用的SECOND backbone）。
 
-### Major features
+![MXV与我们的差异](https://image.discover304.top/blog-img/s16510403242022-202232416516.png)
 
-- **Support multi-modality/single-modality detectors out of box**
+---
+### 日志03
 
-  It directly supports multi-modality/single-modality detectors including MVXNet, VoteNet, PointPillars, etc.
+哪一块儿网络需要预训练参数，哪里就加上Pretrained参数，格式为`Pretrained="<模型路径>"`
 
-- **Support indoor/outdoor 3D detection out of box**
+小技巧：直接搜索配置文件中的tpye关键字即可找到对应的模型类位置。
 
-  It directly supports popular indoor and outdoor 3D detection datasets, including ScanNet, SUNRGB-D, Waymo, nuScenes, Lyft, and KITTI.
-  For nuScenes dataset, we also support [nuImages dataset](https://github.com/open-mmlab/mmdetection3d/tree/master/configs/nuimages).
+主模态交换网络是可以使用的，而且很容易实现，因为在fusion返回了每一个模态对应的输出，所以只要融合以后返回对应的就好了。
 
-- **Natural integration with 2D detection**
+辅模态Attention机制稍微有些麻烦，需要多出来很多的计算量，但是也是很简单就可以实现的。
 
-  All the about **300+ models, methods of 40+ papers**, and modules supported in [MMDetection](https://github.com/open-mmlab/mmdetection/blob/master/docs/en/model_zoo.md) can be trained or used in this codebase.
+[PAConv: Position Adaptive Convolution with Dynamic Kernel Assembling on Point Clouds](https://arxiv.org/pdf/2103.14635.pdf)
 
-- **High efficiency**
+![s18572103252022-2022325185722](https://image.discover304.top/blog-img/s18572103252022-2022325185722.png)
 
-  It trains faster than other codebases. The main results are as below. Details can be found in [benchmark.md](./docs/en/benchmarks.md). We compare the number of samples trained per second (the higher, the better). The models that are not supported by other codebases are marked by `×`.
+我们也可以直接用PointNet++的解码器来做这件事。
 
-  | Methods | MMDetection3D | [OpenPCDet](https://github.com/open-mmlab/OpenPCDet) |[votenet](https://github.com/facebookresearch/votenet)| [Det3D](https://github.com/poodarchu/Det3D) |
-  |:-------:|:-------------:|:---------:|:-----:|:-----:|
-  | VoteNet | 358           | ×         |   77  | ×     |
-  | PointPillars-car| 141           | ×         |   ×  | 140     |
-  | PointPillars-3class| 107           |44     |   ×      | ×    |
-  | SECOND| 40           |30     |   ×      | ×    |
-  | Part-A2| 17           |14     |   ×      | ×    |
+---
+### 日志04
 
-Like [MMDetection](https://github.com/open-mmlab/mmdetection) and [MMCV](https://github.com/open-mmlab/mmcv), MMDetection3D can also be used as a library to support different projects on top of it.
+将数据集软链接到工作目录下。
 
-## License
+使用wget下载anaconda，配置运行权限，开始安装。
 
-This project is released under the [Apache 2.0 license](LICENSE).
+```bash
+conda install pytorch==1.10.1 torchvision==0.11.2 torchaudio==0.10.1 cudatoolkit=11.3 -c pytorch -c conda-forge
+pip install "mmcv-full>=1.3.17, <=1.5.0" -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.10.1/index.html
+pip install "mmdet>=2.19.0, <=3.0.0"
+pip install "mmsegmentation>=0.20.0, <=1.0.0" 
 
-## Changelog
-
-v1.0.0rc0 was released in 18/2/2022.
-Please refer to [changelog.md](docs/en/changelog.md) for details and release history.
-
-## Benchmark and model zoo
-
-Results and models are available in the [model zoo](docs/en/model_zoo.md).
-
-<div align="center">
-  <b>Components</b>
-</div>
-<table align="center">
-  <tbody>
-    <tr align="center" valign="bottom">
-      <td>
-        <b>Backbones</b>
-      </td>
-      <td>
-        <b>Heads</b>
-      </td>
-      <td>
-        <b>Features</b>
-      </td>
-    </tr>
-    <tr valign="top">
-      <td>
-      <ul>
-        <li><a href="configs/pointnet2">PointNet (CVPR'2017)</a></li>
-        <li><a href="configs/pointnet2">PointNet++ (NeurIPS'2017)</a></li>
-        <li><a href="configs/regnet">RegNet (CVPR'2020)</a></li>
-        <li><a href="configs/dgcnn">DGCNN (TOG'2019)</a></li>
-        <li>DLA (CVPR'2018)</li>
-      </ul>
-      </td>
-      <td>
-      <ul>
-        <li><a href="configs/free_anchor">FreeAnchor (NeurIPS'2019)</a></li>
-      </ul>
-      </td>
-      <td>
-      <ul>
-        <li><a href="configs/dynamic_voxelization">Dynamic Voxelization (CoRL'2019)</a></li>
-      </ul>
-      </td>
-    </tr>
-</td>
-    </tr>
-  </tbody>
-</table>
-
-<div align="center">
-  <b>Architectures</b>
-</div>
-<table align="center">
-  <tbody>
-    <tr align="center" valign="middle">
-      <td>
-        <b>3D Object Detection</b>
-      </td>
-      <td>
-        <b>Monocular 3D Object Detection</b>
-      </td>
-      <td>
-        <b>Multi-modal 3D Object Detection</b>
-      </td>
-      <td>
-        <b>3D Semantic Segmentation</b>
-      </td>
-    </tr>
-    <tr valign="top">
-      <td>
-        <li><b>Outdoor</b></li>
-        <ul>
-            <li><a href="configs/second">SECOND (Sensor'2018)</a></li>
-            <li><a href="configs/pointpillars">PointPillars (CVPR'2019)</a></li>
-            <li><a href="configs/ssn">SSN (ECCV'2020)</a></li>
-            <li><a href="configs/3dssd">3DSSD (CVPR'2020)</a></li>
-            <li><a href="configs/point_rcnn">PointRCNN (CVPR'2019)</a></li>
-            <li><a href="configs/parta2">Part-A2 (TPAMI'2020)</a></li>
-            <li><a href="configs/centerpoint">CenterPoint (CVPR'2021)</a></li>
-        </ul>
-        <li><b>Indoor</b></li>
-        <ul>
-            <li><a href="configs/votenet">VoteNet (ICCV'2019)</a></li>
-            <li><a href="configs/h3dnet">H3DNet (ECCV'2020)</a></li>
-            <li><a href="configs/groupfree3d">Group-Free-3D (ICCV'2021)</a></li>
-      </ul>
-      </td>
-      <td>
-        <li><b>Outdoor</b></li>
-        <ul>
-          <li><a href="configs/imvoxelnet">ImVoxelNet (WACV'2022)</a></li>
-          <li><a href="configs/smoke">SMOKE (CVPRW'2020)</a></li>
-          <li><a href="configs/fcos3d">FCOS3D (ICCVW'2021)</a></li>
-          <li><a href="configs/pgd">PGD (CoRL'2021)</a></li>
-          <li><a href="configs/monoflex">MonoFlex (CVPR'2021)</a></li>
-        </ul>
-      </td>
-      <td>
-        <li><b>Outdoor</b></li>
-        <ul>
-          <li><a href="configs/mvxnet">MVXNet (ICRA'2019)</a></li>
-        </ul>
-        <li><b>Indoor</b></li>
-        <ul>
-          <li><a href="configs/imvotenet">ImVoteNet (CVPR'2020)</a></li>
-        </ul>
-      </td>
-      <td>
-        <li><b>Indoor</b></li>
-        <ul>
-          <li><a href="configs/pointnet2">PointNet++ (NeurIPS'2017)</a></li>
-          <li><a href="configs/paconv">PAConv (CVPR'2021)</a></li>
-          <li><a href="configs/dgcnn">DGCNN (TOG'2019)</a></li>
-        </ul>
-      </ul>
-      </td>
-    </tr>
-</td>
-    </tr>
-  </tbody>
-</table>
-
-|                    | ResNet   | ResNeXt  | SENet    |PointNet++ |DGCNN     | HRNet | RegNetX | Res2Net | DLA |
-|--------------------|:--------:|:--------:|:--------:|:---------:|:---------:|:-----:|:--------:|:-----:|:---:|
-| SECOND             | ☐        | ☐        | ☐        | ✗         | ✗         | ☐     | ✓        | ☐     | ✗
-| PointPillars       | ☐        | ☐        | ☐        | ✗         | ✗         | ☐     | ✓        | ☐     | ✗
-| FreeAnchor         | ☐        | ☐        | ☐        | ✗         | ✗         | ☐     | ✓        | ☐     | ✗
-| VoteNet            | ✗        | ✗        | ✗        | ✓         | ✗         | ✗     | ✗        | ✗     | ✗
-| H3DNet            | ✗        | ✗        | ✗        | ✓         | ✗         | ✗     | ✗        | ✗     | ✗
-| 3DSSD            | ✗        | ✗        | ✗        | ✓         | ✗         | ✗     | ✗        | ✗     | ✗
-| Part-A2            | ☐        | ☐        | ☐        | ✗         | ✗         | ☐     | ✓        | ☐     | ✗
-| MVXNet             | ☐        | ☐        | ☐        | ✗         | ✗         | ☐     | ✓        | ☐     | ✗
-| CenterPoint        | ☐        | ☐        | ☐        | ✗         | ✗         | ☐     | ✓        | ☐     | ✗
-| SSN                | ☐        | ☐        | ☐        | ✗         | ✗         | ☐     | ✓        | ☐     | ✗
-| ImVoteNet            | ✗        | ✗        | ✗        | ✓         | ✗         | ✗     | ✗        | ✗     | ✗
-| FCOS3D               | ✓        | ☐        | ☐        | ✗         | ✗         | ☐     | ☐        | ☐     | ✗
-| PointNet++           | ✗        | ✗        | ✗        | ✓         | ✗         | ✗     | ✗        | ✗     | ✗
-| Group-Free-3D        | ✗        | ✗        | ✗        | ✓         | ✗         | ✗     | ✗        | ✗     | ✗
-| ImVoxelNet           | ✓         | ✗        | ✗        | ✗        | ✗         | ✗     | ✗        | ✗     | ✗
-| PAConv               | ✗        | ✗        | ✗        | ✓         | ✗         | ✗     | ✗        | ✗     | ✗
-| DGCNN                | ✗        | ✗        | ✗        | ✗         | ✓         | ✗     | ✗        | ✗     | ✗
-| SMOKE                | ✗        | ✗        | ✗        | ✗         | ✗         | ✗     | ✗        | ✗     | ✓
-| PGD                  | ✓        | ☐        | ☐        | ✗         | ✗         | ☐     | ☐        | ☐     | ✗
-| MonoFlex             | ✗        | ✗        | ✗        | ✗         | ✗         | ✗     | ✗        | ✗     | ✓
-
-
-**Note:** All the about **300+ models, methods of 40+ papers** in 2D detection supported by [MMDetection](https://github.com/open-mmlab/mmdetection/blob/master/docs/en/model_zoo.md) can be trained or used in this codebase.
-
-## Installation
-
-Please refer to [getting_started.md](docs/en/getting_started.md) for installation.
-
-## Get Started
-
-Please see [getting_started.md](docs/en/getting_started.md) for the basic usage of MMDetection3D. We provide guidance for quick run [with existing dataset](docs/en/1_exist_data_model.md) and [with customized dataset](docs/en/2_new_data_model.md) for beginners. There are also tutorials for [learning configuration systems](docs/en/tutorials/config.md), [adding new dataset](docs/en/tutorials/customize_dataset.md), [designing data pipeline](docs/en/tutorials/data_pipeline.md), [customizing models](docs/en/tutorials/customize_models.md), [customizing runtime settings](docs/en/tutorials/customize_runtime.md) and [Waymo dataset](docs/en/datasets/waymo_det.md).
-
-Please refer to [FAQ](docs/en/faq.md) for frequently asked questions. When updating the version of MMDetection3D, please also check the [compatibility doc](docs/en/compatibility.md) to be aware of the BC-breaking updates introduced in each version.
-
-## Citation
-
-If you find this project useful in your research, please consider cite:
-
-```latex
-@misc{mmdet3d2020,
-    title={{MMDetection3D: OpenMMLab} next-generation platform for general {3D} object detection},
-    author={MMDetection3D Contributors},
-    howpublished = {\url{https://github.com/open-mmlab/mmdetection3d}},
-    year={2020}
-}
+python tools/train.py configs/xnet/xnet_model_Voxel_SECOND_ResNet_Fusion_kitti-3d-car.py
 ```
 
-## Contributing
+---
+### 日志05
 
-We appreciate all contributions to improve MMDetection3D. Please refer to [CONTRIBUTING.md](.github/CONTRIBUTING.md) for the contributing guideline.
+原先使用的MVX使用的是预训练图像特征提取网络，所以代码中没有图像特征提取模型的训练。
 
-## Acknowledgement
+![](https://image.discover304.top/blog-img/s11251303302022-2022330112513.png)
 
-MMDetection3D is an open source project that is contributed by researchers and engineers from various colleges and companies. We appreciate all the contributors as well as users who give valuable feedbacks.
-We wish that the toolbox and benchmark could serve the growing research community by providing a flexible toolkit to reimplement existing methods and develop their own new 3D detectors.
+训练baseline
+1.
+```
 
-## Projects in OpenMMLab
-
-- [MMCV](https://github.com/open-mmlab/mmcv): OpenMMLab foundational library for computer vision.
-- [MIM](https://github.com/open-mmlab/mim): MIM Installs OpenMMLab Packages.
-- [MMClassification](https://github.com/open-mmlab/mmclassification): OpenMMLab image classification toolbox and benchmark.
-- [MMDetection](https://github.com/open-mmlab/mmdetection): OpenMMLab detection toolbox and benchmark.
-- [MMDetection3D](https://github.com/open-mmlab/mmdetection3d): OpenMMLab next-generation platform for general 3D object detection.
-- [MMSegmentation](https://github.com/open-mmlab/mmsegmentation): OpenMMLab semantic segmentation toolbox and benchmark.
-- [MMAction2](https://github.com/open-mmlab/mmaction2): OpenMMLab's next-generation action understanding toolbox and benchmark.
-- [MMTracking](https://github.com/open-mmlab/mmtracking): OpenMMLab video perception toolbox and benchmark.
-- [MMPose](https://github.com/open-mmlab/mmpose): OpenMMLab pose estimation toolbox and benchmark.
-- [MMEditing](https://github.com/open-mmlab/mmediting): OpenMMLab image and video editing toolbox.
-- [MMOCR](https://github.com/open-mmlab/mmocr): OpenMMLab text detection, recognition and understanding toolbox.
-- [MMGeneration](https://github.com/open-mmlab/mmgeneration): OpenMMLab image and video generative models toolbox.
-- [MMFlow](https://github.com/open-mmlab/mmflow): OpenMMLab optical flow toolbox and benchmark.
-- [MMFewShot](https://github.com/open-mmlab/mmfewshot): OpenMMLab fewshot learning toolbox and benchmark.
-- [MMHuman3D](https://github.com/open-mmlab/mmhuman3d): OpenMMLab 3D human parametric model toolbox and benchmark.
-- [MMSelfSup](https://github.com/open-mmlab/mmselfsup): OpenMMLab self-supervised learning toolbox and benchmark.
-- [MMRazor](https://github.com/open-mmlab/mmrazor): OpenMMLab Model Compression Toolbox and Benchmark.
-- [MMDeploy](https://github.com/open-mmlab/mmdeploy): OpenMMLab Model Deployment Framework.
+```
