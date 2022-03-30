@@ -82,4 +82,35 @@ python tools/train.py ${CONFIG_FILE} [optional arguments]
 CUDA_VISIBLE_DEVICES=0,1,2,3 ./tools/dist_train.sh ${CONFIG_FILE} 4
 ```
 
-注：对于多显卡训练，需要确保每一个
+```bash
+# 单块显卡测试/生成评估结果
+python 
+    tools/test.py 
+        ${CONFIG_FILE} 
+        ${CHECKPOINT_FILE} 
+        [--out ${RESULT_FILE}] 
+        [--eval ${EVAL_METRICS}] 
+        [--show]
+        [--show-dir ${SHOW_DIR}] 
+
+# 多块显卡测试//生成评估结果
+./tools/dist_test.sh 
+    ${CONFIG_FILE} 
+    ${CHECKPOINT_FILE} 
+    ${GPU_NUM} 
+    [--out ${RESULT_FILE}] 
+    [--eval ${EVAL_METRICS}]
+
+# 将三维检测框投影到图像
+python 
+    demo/multi_modality_demo.py 
+        ${PCD_FILE} 
+        ${IMAGE_FILE} 
+        ${ANNOTATION_FILE} 
+        ${CONFIG_FILE} 
+        ${CHECKPOINT_FILE} 
+        [--device ${GPU_ID}] 
+        [--score-thr ${SCORE_THR}] 
+        [--out-dir ${OUT_DIR}] 
+        [--show]
+```
