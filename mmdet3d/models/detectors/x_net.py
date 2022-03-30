@@ -30,6 +30,7 @@ class XNet(Base3DDetector):
                  img_backbone=None,
                  img_neck=None,
                  fusion_layer=None,
+                 decoder=None,
                  pts_bbox_head=None,
                  img_rpn_head=None,
                  img_roi_head=None,
@@ -64,6 +65,11 @@ class XNet(Base3DDetector):
             self.fusion_layer = builder.build_fusion_layer(
                 fusion_layer)
 
+        # 融合网路解码器
+        # if decoder:
+        #     self.decoder = builder.build_decoder_layer(
+        #         decoder)
+        
         # 点云目标检测检测头 Point Cloud Object Detection Head
         if pts_bbox_head:
             pts_train_cfg = train_cfg.pts if train_cfg else None
@@ -195,9 +201,13 @@ class XNet(Base3DDetector):
 
     def extract_feat(self, points, img, img_metas):
         """Extract features from images and points."""
-        img_feats = self.extract_img_feat(img, img_metas)
         pts_feats = self.extract_pts_feat(points)
-        img_feats, pts_feats = self.fusion_layer(img_feats, pts_feats)
+        if self.with_img_backbone:
+            img_feats = self.extract_img_feat(img, img_metas)
+            if self.with_fusion:
+                img_feats, pts_feats = self.fusion_layer(img_feats, pts_feats)
+        else:
+            img_feats=None
         return (img_feats, pts_feats)
 
     @torch.no_grad()

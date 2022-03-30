@@ -3,6 +3,22 @@ voxel_size = [0.05, 0.05, 0.1]
 model = dict(
     type='XNet',
     
+    # 图像特征提取 Image Feature Extraction
+    img_backbone=dict(
+        type='ResNet',
+        depth=18,
+        num_stages=4,
+        out_indices=(0, 1, 2, 3),
+        frozen_stages=1,
+        norm_cfg=dict(type='BN', requires_grad=False),
+        norm_eval=True,
+        style='caffe'),
+    img_neck=dict(
+        type='FPN',
+        in_channels=[64, 128, 256, 512],
+        out_channels=512,
+        num_outs=5),
+    
     # 点云特征提取 Point Cloud Feature Extraction
     pts_voxel_layer=dict(
         max_num_points=5,
@@ -28,33 +44,19 @@ model = dict(
         upsample_strides=[1, 2],
         out_channels=[256, 256]),
 
-    # 图像特征提取 Image Feature Extraction
-    img_backbone=dict(
-        type='ResNet',
-        depth=18,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
-        norm_cfg=dict(type='BN', requires_grad=False),
-        norm_eval=True,
-        style='caffe'),
-    img_neck=dict(
-        type='FPN',
-        in_channels=[64, 128, 256, 512],
-        out_channels=256,
-        num_outs=5),
-
     # 特征级别融合网络 Feature Fusion
     fusion_layer=dict(
-        type='NoneFusion'),
+        type='CatFusion',
+        img_channels=512,
+        pts_channels=512),
 
     # 解码器
+    decoder=None,
 
     # 点云目标检测检测头 Point Cloud Object Detection Head
     pts_bbox_head=dict(
         type='Anchor3DHead',
         num_classes=3,
-        in_channels=512,
         feat_channels=512,
         use_direction_classifier=True,
         anchor_generator=dict(

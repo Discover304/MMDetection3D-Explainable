@@ -19,7 +19,6 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
 
     Args:
         num_classes (int): Number of classes.
-        in_channels (int): Number of channels in the input feature map.
         train_cfg (dict): Train configs.
         test_cfg (dict): Test configs.
         feat_channels (int): Number of channels of the feature map.
@@ -42,7 +41,6 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
 
     def __init__(self,
                  num_classes,
-                 in_channels,
                  train_cfg,
                  test_cfg,
                  feat_channels=256,
@@ -70,7 +68,6 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
                  loss_dir=dict(type='CrossEntropyLoss', loss_weight=0.2),
                  init_cfg=None):
         super().__init__(init_cfg=init_cfg)
-        self.in_channels = in_channels
         self.num_classes = num_classes
         self.feat_channels = feat_channels
         self.diff_rad_by_sin = diff_rad_by_sin

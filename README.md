@@ -93,7 +93,7 @@ python
         [--show]
         [--show-dir ${SHOW_DIR}] 
 
-# 多块显卡测试//生成评估结果
+# 多块显卡测试/生成评估结果
 ./tools/dist_test.sh 
     ${CONFIG_FILE} 
     ${CHECKPOINT_FILE} 
