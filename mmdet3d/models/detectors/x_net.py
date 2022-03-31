@@ -30,6 +30,7 @@ class XNet(Base3DDetector):
                  img_backbone=None,
                  img_neck=None,
                  fusion_layer=None,
+                 fusion_neck=None,
                  decoder=None,
                  pts_bbox_head=None,
                  img_rpn_head=None,
@@ -64,6 +65,8 @@ class XNet(Base3DDetector):
         if fusion_layer:
             self.fusion_layer = builder.build_fusion_layer(
                 fusion_layer)
+        if fusion_neck:
+            self.fusion_neck = builder.build_neck(fusion_neck)
 
         # 融合网路解码器
         # if decoder:
@@ -184,8 +187,10 @@ class XNet(Base3DDetector):
             img_feats = self.img_backbone(img)
         else:
             return None
+        print(f"xnet/img_backbone: {[x.size() for x in img_feats]}")
         if self.with_img_neck:
             img_feats = self.img_neck(img_feats)
+            print(f"xnet/img_neck: {[x.size() for x in img_feats]}")
         return img_feats
 
     def extract_pts_feat(self, points):
@@ -193,11 +198,13 @@ class XNet(Base3DDetector):
         voxels, num_points, coors = self.voxelize(points)
         voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0].item() + 1
-        x = self.pts_middle_encoder(voxel_features, coors, batch_size)
-        x = self.pts_backbone(x)
+        pts_feats = self.pts_middle_encoder(voxel_features, coors, batch_size)
+        pts_feats = self.pts_backbone(pts_feats)
+        print(f"xnet/pts_backbone: {[x.size() for x in pts_feats]}")
         if self.with_pts_neck:
-            x = self.pts_neck(x)
-        return x
+            pts_feats = self.pts_neck(pts_feats)
+            print(f"xnet/pts_neck: {[x.size() for x in pts_feats]}")
+        return pts_feats
 
     def extract_feat(self, points, img, img_metas):
         """Extract features from images and points."""
@@ -205,10 +212,13 @@ class XNet(Base3DDetector):
         if self.with_img_backbone:
             img_feats = self.extract_img_feat(img, img_metas)
             if self.with_fusion:
-                img_feats, pts_feats = self.fusion_layer(img_feats, pts_feats)
+                fuse_out = [self.fusion_layer(img_feats, pts_feats)]
+                print(f"xnet/fusion_layer: {[x.size() for x in fuse_out]}")
+                torch.cuda.empty_cache() 
+                return fuse_out, fuse_out
         else:
             img_feats=None
-        return (img_feats, pts_feats)
+        return img_feats, pts_feats
 
     @torch.no_grad()
     @force_fp32()

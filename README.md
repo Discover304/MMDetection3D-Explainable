@@ -114,3 +114,8 @@ python
         [--out-dir ${OUT_DIR}] 
         [--show]
 ```
+
+### 日志06
+
+- 显存问题：[Pytorch Memory management](https://pytorch.org/docs/stable/notes/cuda.html#memory-management)
+- 解决no grad问题：https://discuss.pytorch.org/t/ddp-parameters-didnt-receive-gradients-for-used-module/137796

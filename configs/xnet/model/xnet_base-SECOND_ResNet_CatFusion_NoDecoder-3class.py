@@ -47,8 +47,11 @@ model = dict(
     # 特征级别融合网络 Feature Fusion
     fusion_layer=dict(
         type='CatFusion',
-        img_channels=512,
-        pts_channels=512),
+        img_channel=512,
+        img_levels=5,
+        pts_channel=256,
+        pts_levels=1,
+        out_channel=128),
 
     # 解码器
     decoder=None,
@@ -57,7 +60,7 @@ model = dict(
     pts_bbox_head=dict(
         type='Anchor3DHead',
         num_classes=3,
-        feat_channels=512,
+        feat_channels=128,
         use_direction_classifier=True,
         anchor_generator=dict(
             type='Anchor3DRangeGenerator',
