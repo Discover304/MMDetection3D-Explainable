@@ -119,3 +119,7 @@ python
 
 - 显存问题：[Pytorch Memory management](https://pytorch.org/docs/stable/notes/cuda.html#memory-management)
 - 解决no grad问题：https://discuss.pytorch.org/t/ddp-parameters-didnt-receive-gradients-for-used-module/137796
+
+## 日志07
+
+- concate方法实现，不需要修改太多的东西，我们只需要保证Fusion layer输出的形状是4维即可。

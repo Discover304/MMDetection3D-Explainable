@@ -8,16 +8,16 @@ model = dict(
         type='ResNet',
         depth=18,
         num_stages=4,
-        out_indices=(0, 1, 2, 3),
+        out_indices=(1, 3),
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=False),
         norm_eval=True,
         style='caffe'),
     img_neck=dict(
         type='FPN',
-        in_channels=[64, 128, 256, 512],
+        in_channels=[128, 512],
         out_channels=512,
-        num_outs=5),
+        num_outs=2),
     
     # 点云特征提取 Point Cloud Feature Extraction
     pts_voxel_layer=dict(
@@ -47,11 +47,12 @@ model = dict(
     # 特征级别融合网络 Feature Fusion
     fusion_layer=dict(
         type='CatFusion',
-        img_channel=512,
-        img_levels=5,
-        pts_channel=256,
+        img_channels=512,
+        img_levels=2,
+        pts_channels=512,
         pts_levels=1,
-        out_channel=128),
+        hide_channels=256,
+        out_channels=128),
 
     # 解码器
     decoder=None,
