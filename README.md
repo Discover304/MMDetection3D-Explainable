@@ -123,3 +123,39 @@ python
 ## 日志07
 
 - concate方法实现，不需要修改太多的东西，我们只需要保证Fusion layer输出的形状是4维即可。
+
+可以使用tensorboard监控训练过程：
+
+```bash
+# 启动制作好的tensorboard环境
+conda activate tensorboard-view
+
+# 启动tensorboard
+LOG_DIR="relative/path/to/tf_logs/dir"
+tensorboard --logdir ${LOG_DIR}
+```
+
+使用vscode执行上述命令后，服务器上的链接会转到本地，根据终端提示，打开链接即可看到监控窗口。
+
+![tensorboard_view](https://image.discover304.top/tensorboard_view.jpg?imageView2/2/h/600)
+
+
+## 日志08
+
+- Linux 启动后台任务的指令的方法是在命令后添加`&`，但是这段命令是当前终端的子线程，终端退出，线程结束。如果不希望子线程退出，可以使用`nohup`命令，忽略退出命令。参考：[Linux nohup 命令](https://www.runoob.com/linux/linux-comm-nohup.html)
+
+可以写一个后台多显卡训练脚本：
+
+```bash
+#!/bin/bash
+CONFIG_FILE="relative/path/to/config/file"
+NUM_GPUS=5
+
+CUDA_VISIBLE_DEVICES=0,1,2,5,6 \
+PORT=8990 \
+nohup \
+    tools/dist_train.sh \
+        ${CONFIG_FILE} \
+        ${NUM_GPUS} \
+&
+```

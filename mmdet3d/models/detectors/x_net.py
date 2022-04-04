@@ -212,7 +212,7 @@ class XNet(Base3DDetector):
         if self.with_img_backbone:
             img_feats = self.extract_img_feat(img, img_metas)
             if self.with_fusion:
-                fuse_out = [self.fusion_layer(img_feats, pts_feats).unsqueeze(-1)]
+                fuse_out = [self.fusion_layer(img_feats, pts_feats)]
                 # print(f"xnet/fusion_layer: {[x.size() for x in fuse_out]}")
                 torch.cuda.empty_cache() 
                 return fuse_out, fuse_out

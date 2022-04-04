@@ -70,7 +70,7 @@ class CatFusion(BaseModule):
                                 inplace=True)
 
         self.fuse_conv = ConvModule(
-                                in_channels=hide_channels,
+                                in_channels=hide_channels+hide_channels,
                                 out_channels=out_channels,
                                 kernel_size=1,
                                 padding=0,
@@ -79,31 +79,32 @@ class CatFusion(BaseModule):
                                 act_cfg=dict(type='ReLU'),
                                 bias=True,
                                 inplace=True)
-    
 
-    def forward(self, img_feats, pts_feats):        
-        img_feats = self.obtain_mlvl_feats(img_feats, self.img_channels, self.img_levels)
-        img_pre_fuse = self.img_transform(img_feats)
+
+    def forward(self, img_feats, pts_feats):    
+        N, C, H, W = pts_feats[0].size() 
+           
+        pts_pre_fuse = self.pts_transform(pts_feats[0].view(N, C, -1))
+        if self.training and self.dropout_ratio > 0:
+            pts_pre_fuse = F.dropout(pts_pre_fuse, self.dropout_ratio)
+        # print(f"fusion_layer/pts_pre_fuse: {pts_pre_fuse.size()}")
+         
+        img_feats = self.obtain_img_mlvl_feats_of_pts(img_feats, self.img_levels, H, W)
+        img_pre_fuse = self.img_transform(img_feats.view(N, C, -1))
         if self.training and self.dropout_ratio > 0:
             img_pre_fuse = F.dropout(img_pre_fuse, self.dropout_ratio)
         # print(f"fusion_layer/img_pre_fuse: {img_pre_fuse.size()}")
         
-        pts_feats = self.obtain_mlvl_feats(pts_feats, self.pts_channels, self.pts_levels)
-        pts_pre_fuse = self.pts_transform(pts_feats)
-        if self.training and self.dropout_ratio > 0:
-            pts_pre_fuse = F.dropout(pts_pre_fuse, self.dropout_ratio)
-        # print(f"fusion_layer/pts_pre_fuse: {pts_pre_fuse.size()}")
-        
-        concate_out = torch.cat((img_pre_fuse, pts_pre_fuse), dim=-1)
+        concate_out = torch.cat((img_pre_fuse, pts_pre_fuse), dim=1)
         # print(f"fusion_layer/concate_out: {concate_out.size()}")
         
-        fuse_out = self.fuse_conv(concate_out)
+        fuse_out = self.fuse_conv(concate_out).view(N, self.out_channels, H, W)
         # print(f"fusion_layer/fuse_out: {fuse_out.size()}")
         
         return fuse_out
     
     
-    def obtain_mlvl_feats(self, feats, channels, levels):
+    def obtain_img_mlvl_feats_of_pts(self, feats, levels, pts_H, pts_W):
         """Obtain multi-level features for point features.
 
         Args:
@@ -117,13 +118,23 @@ class CatFusion(BaseModule):
         mlvl_feats_list = []
         # Sample multi-level features
         for i in range(feats[0].size()[0]):
-            mlvl_feats = []
+            mlvl_feat = None
             # torch.cuda.empty_cache() 
             for level in range(levels):
                 feat = feats[level][i:i + 1]
-                mlvl_feats.append(feat.view(channels, -1))
-            mlvl_feats_list.append(torch.cat(mlvl_feats, dim=-1))
-        mlvl_feats = torch.stack(mlvl_feats_list, dim=0)
+                # print(f"fusion_layer/img_fpn_feat: {feat.size()}")
+                # sum and pad to pts structure
+                N, C, H, W = feat.size()
+                diff_H = pts_H-H
+                diff_W = pts_W-W
+                if mlvl_feat!=None:
+                    mlvl_feat += F.pad(feat, (diff_W//2, diff_W-diff_W//2, diff_H//2, diff_H-diff_H//2), 
+                                        mode="replicate")
+                else:
+                    mlvl_feat = F.pad(feat, (diff_W//2, diff_W-diff_W//2, diff_H//2, diff_H-diff_H//2), 
+                                        mode="replicate")
+            mlvl_feats_list.append(mlvl_feat)
+        mlvl_feats = torch.cat(mlvl_feats_list, dim=0)
         # print(f"fusion_layer/mlvl_feats: {mlvl_feats.size()}")
         return mlvl_feats
 
