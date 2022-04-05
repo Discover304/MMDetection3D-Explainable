@@ -120,7 +120,7 @@ python
 - 显存问题：[Pytorch Memory management](https://pytorch.org/docs/stable/notes/cuda.html#memory-management)
 - 解决no grad问题：https://discuss.pytorch.org/t/ddp-parameters-didnt-receive-gradients-for-used-module/137796
 
-## 日志07
+### 日志07
 
 - concate方法实现，不需要修改太多的东西，我们只需要保证Fusion layer输出的形状是4维即可。
 
@@ -140,7 +140,7 @@ tensorboard --logdir ${LOG_DIR}
 ![tensorboard_view](https://image.discover304.top/tensorboard_view.jpg?imageView2/2/h/600)
 
 
-## 日志08
+### 日志08
 
 - Linux 启动后台任务的指令的方法是在命令后添加`&`，但是这段命令是当前终端的子线程，终端退出，线程结束。如果不希望子线程退出，可以使用`nohup`命令，忽略退出命令。参考：[Linux nohup 命令](https://www.runoob.com/linux/linux-comm-nohup.html)
 
@@ -158,4 +158,28 @@ nohup \
         ${CONFIG_FILE} \
         ${NUM_GPUS} \
 &
+```
+
+### 日志09
+
+- 完成GPU排队脚本：脚本详情待更新
+
+Pearson相关矩阵
+- [numpy官方实现API](https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html)
+- [pytorch官方实现API](https://pytorch.org/docs/stable/generated/torch.corrcoef.html)
+
+图神经网络torch库
+- [仓库地址](https://github.com/pyg-team/pytorch_geometric#quick-tour-for-new-users)
+- [文档地址](https://pytorch-geometric.readthedocs.io/en/latest/)
+
+## 更新通知格式
+
+```txt
+代码更新
+
+更新内容：这里可以写 commit message
+
+下一步开发任务：稍微写一下
+
+Gitee仓库链接：https://gitee.com/discover304/MMDetection3D-Explainable 
 ```
