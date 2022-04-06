@@ -172,6 +172,16 @@ Pearson相关矩阵
 - [仓库地址](https://github.com/pyg-team/pytorch_geometric#quick-tour-for-new-users)
 - [文档地址](https://pytorch-geometric.readthedocs.io/en/latest/)
 
+## 日志10
+
+释放引后台脚本占用的GPU
+```bash
+ps -ef | grep yanghao+.*train.py | grep -v grep |cut -c 9-15 | xargs kill
+```
+
+- 第一版PearsonFusion：将高相关性的通道剔除，保留相互独立的通道。
+  - 改进策略：高相关性的通道应该也需要保留才对，而不是一股脑剔除。就像之前说过的，将高相关性的通道取平均，将独立的通道叠加
+
 ## 更新通知格式
 
 ```txt

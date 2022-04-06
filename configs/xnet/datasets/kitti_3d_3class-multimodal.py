@@ -109,7 +109,7 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=6,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
