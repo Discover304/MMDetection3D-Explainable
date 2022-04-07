@@ -207,16 +207,23 @@ class PearsonFusion(BaseModule):
         if self.training and self.dropout_ratio > 0:
             img_pre_fuse = F.dropout(img_pre_fuse, self.dropout_ratio)
         # print(f"fusion_layer/img_pre_fuse: {img_pre_fuse.size()}")
-        
-        concate_out = torch.cat((img_pre_fuse, pts_pre_fuse), dim=1)   
-        
-        # process concate out according with Pearson Relationship Matrix         
-        for n in range(N):
-            correlation = torch.abs(torch.corrcoef(concate_out[n]))
-            for c in range(correlation.size(0)):
-                sub_channels = concate_out[n][correlation[c]>=self.correlation_limit]
-                concate_out[n][c] = torch.mean(sub_channels, dim=0)
+                
+        concate_out = torch.cat((img_pre_fuse, pts_pre_fuse), dim=1)
         # print(f"fusion_layer/concate_out: {concate_out.size()}")
+
+        filter_out = []
+        for sample in concate_out:
+            sample = torch.nan_to_num(sample, nan=0, posinf=0)
+            # print(f"fusion_layer/sample: {sample}")
+            correlation = torch.corrcoef(sample)
+            correlation = torch.nan_to_num(correlation, nan=0, posinf=0)
+            correlation[torch.abs(correlation)<=self.correlation_limit] = 0
+            correlation[correlation>self.correlation_limit] = 1
+            correlation[correlation<-1*self.correlation_limit] = -1
+            # print(f"fusion_layer/correlation: {correlation}")
+            filter_out.append(torch.mm(correlation, sample))
+        filter_out = torch.stack(filter_out, dim=0)
+        # print(f"fusion_layer/filter_out: {filter_out.size()}")
 
         fuse_out = self.fuse_conv(concate_out).view(N, self.out_channels, H, W)
         # print(f"fusion_layer/fuse_out: {fuse_out.size()}")
