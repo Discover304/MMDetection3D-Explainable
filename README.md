@@ -115,10 +115,14 @@ python
         [--show]
 ```
 
+---
+
 ### 日志06
 
 - 显存问题：[Pytorch Memory management](https://pytorch.org/docs/stable/notes/cuda.html#memory-management)
 - 解决no grad问题：https://discuss.pytorch.org/t/ddp-parameters-didnt-receive-gradients-for-used-module/137796
+
+---
 
 ### 日志07
 
@@ -139,6 +143,7 @@ tensorboard --logdir ${LOG_DIR}
 
 ![tensorboard_view](https://image.discover304.top/tensorboard_view.jpg?imageView2/2/h/600)
 
+---
 
 ### 日志08
 
@@ -160,6 +165,8 @@ nohup \
 &
 ```
 
+---
+
 ### 日志09
 
 - 完成GPU排队脚本：脚本详情待更新
@@ -172,7 +179,10 @@ Pearson相关矩阵
 - [仓库地址](https://github.com/pyg-team/pytorch_geometric#quick-tour-for-new-users)
 - [文档地址](https://pytorch-geometric.readthedocs.io/en/latest/)
 
-## 日志10
+
+---
+
+### 日志10
 
 释放引后台脚本占用的GPU
 ```bash
@@ -181,6 +191,41 @@ ps -ef | grep yanghao+.*train.py | grep -v grep |cut -c 9-15 | xargs kill
 
 - 第一版PearsonFusion：将高相关性的通道剔除，保留相互独立的通道。
   - 改进策略：高相关性的通道应该也需要保留才对，而不是一股脑剔除。就像之前说过的，将高相关性的通道取平均，将独立的通道叠加
+
+---
+
+### 日志11
+
+- 使用 gcn2 作为主要网络
+
+---
+
+### 日志12
+
+首先最开始的pearson fusion的简单融合方法是不可行的，不能很好的进行特征提取。如果在后面添加太过庞大的GNN网络，现在的设备是运算不动的，所以我们缩小我们的网络，在表层进行初步的特征提取，经过融合后再进行进一步的特征提取。
+
+但是现在的网络结构已经非常简单了，进一步简化可能也没有必要了，所以内存开销是哪里来的呢？无非是参数设置的太大了，减小一些特征通道数量吧。
+
+所以接下来的开发计划如下：
+
+1. 对现在的代码进行重构，使用在模型上添加不同模块的形式，而不是一个一个FusionLayer拆开。
+2. 对代码进行去重，构建更加合理的代码结构，并添加模块的注释。
+
+重构后的融合层分为四个部分：融合前的特征预处理（pre fusion，如特征补齐）、特征相关性图生成（get graph）、特征融合（fusion）、特征融合层颈部网络（fusion neck，与下游任务对接）
+
+需要在服务器有可使用资源的时候进行debug和下一步的开发工作。
+
+接下来是继续增加模块，进行实验。
+
+## 补充说明
+
+|模块|PreFusionCat|GetGraphPearson|FusionNN|FusionSummation|FusionGNN|FusionNeck|
+|-|-|-|-|-|-|-|
+|base||||||||
+|exp00|✅||✅|||✅|
+|exp01|✅|✅||✅||✅|
+|exp02|✅|✅|||✅|✅|
+
 
 ## 更新通知格式
 

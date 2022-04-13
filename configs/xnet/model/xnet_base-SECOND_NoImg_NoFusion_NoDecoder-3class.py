@@ -4,20 +4,8 @@ model = dict(
     type='XNet',
     
     # 图像特征提取 Image Feature Extraction
-    img_backbone=dict(
-        type='ResNet',
-        depth=18,
-        num_stages=4,
-        out_indices=(1, 3),
-        frozen_stages=1,
-        norm_cfg=dict(type='BN', requires_grad=False),
-        norm_eval=True,
-        style='caffe'),
-    img_neck=dict(
-        type='FPN',
-        in_channels=[128, 512],
-        out_channels=512,
-        num_outs=2),
+    img_backbone=None,
+    img_neck=None,
     
     # 点云特征提取 Point Cloud Feature Extraction
     pts_voxel_layer=dict(
@@ -45,14 +33,7 @@ model = dict(
         out_channels=[256, 256]),
 
     # 特征级别融合网络 Feature Fusion
-    fusion_layer=dict(
-        type='PearsonFusion',
-        img_channels=512,
-        img_levels=2,
-        pts_channels=512,
-        pts_levels=1,
-        hide_channels=256,
-        out_channels=128),
+    fusion_layer=None,
 
     # 解码器
     decoder=None,
@@ -61,7 +42,7 @@ model = dict(
     pts_bbox_head=dict(
         type='Anchor3DHead',
         num_classes=3,
-        feat_channels=128,
+        feat_channels=512,
         use_direction_classifier=True,
         anchor_generator=dict(
             type='Anchor3DRangeGenerator',
