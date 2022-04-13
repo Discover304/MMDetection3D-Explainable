@@ -9,6 +9,8 @@ from torch.nn import functional as F
 from mmcv.cnn import ConvModule
 from mmcv.runner import BaseModule
 
+from .notears.nonlinear import NotearsMLP, notears_nonlinear
+
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
@@ -58,7 +60,7 @@ class XnetFusion(BaseModule):
     def with_get_graph_layer(self):
         """bool: Whether the fusion layer need graph."""
         return hasattr(self,
-                       'graph_layer') and self.get_graph_layer is not None
+                       'get_graph_layer') and self.get_graph_layer is not None
 
     @property
     def with_fusion_neck_layer(self):
@@ -92,8 +94,10 @@ class PreFusionCat(BaseModule):
         tuple[torch.Tensor]: Corresponding features of image and points.
     """  
     def __init__(self,
-                img_channels=256,
-                pts_channels=256,
+                img_channels=512,
+                img_out_channels=512,
+                pts_channels=512,
+                pts_out_channels=512,
                 img_levels=5,
                 pts_levels=1,
                 dropout_ratio=0.2,
@@ -104,7 +108,7 @@ class PreFusionCat(BaseModule):
         
         self.img_transform = ConvModule(
                                 in_channels=img_channels,
-                                out_channels=img_channels,
+                                out_channels=img_out_channels,
                                 kernel_size=1,
                                 padding=0,
                                 conv_cfg=dict(type='Conv2d'),
@@ -115,7 +119,7 @@ class PreFusionCat(BaseModule):
         
         self.pts_transform = ConvModule(
                                 in_channels=pts_channels,
-                                out_channels=pts_channels,
+                                out_channels=pts_out_channels,
                                 kernel_size=1,
                                 padding=0,
                                 conv_cfg=dict(type='Conv2d'),
@@ -204,9 +208,10 @@ class GetGraphPearson(BaseModule):
     def forward(self, cat_feats):    
         correlations = []
         for sample in cat_feats:
+            C,_,_ = sample.size()
             sample = torch.nan_to_num(sample, nan=0, posinf=0)
             # print(f"fusion_layer/sample: {sample}")
-            correlation = torch.corrcoef(sample)
+            correlation = torch.corrcoef(sample.view(C,-1))
             correlation = torch.nan_to_num(correlation, nan=0, posinf=0)
             if self.correlation_limit:
                 correlation[torch.abs(correlation)<=self.correlation_limit] = 0
@@ -216,6 +221,25 @@ class GetGraphPearson(BaseModule):
             correlations.append(correlation)
         return correlations
 
+
+@FUSION_LAYERS.register_module()
+class GetGraphNoTear(BaseModule):
+    """get adj matirx via no tear 
+
+    Return:
+        List[torch.Tensor]: if set correlation limit a value (less than 1) it will return a adj matrix with 0s and 1s, if set to none it will return a list of correlation matirx for each sample.
+        
+    """
+    def __init__(self,
+                init_cfg=None):
+        super(GetGraphNoTear, self).__init__(init_cfg=init_cfg)
+
+    def forward(self, cat_feats):    
+        N, C, H, W = cat_feats.size()
+        model = NotearsMLP(dims=[C, H*W, 1], bias=True)
+        W_est = notears_nonlinear(model, cat_feats.view(N,C,-1,1), lambda1=0.01, lambda2=0.01)
+        print(f"fusion_layer/notear_w: {W_est}")
+        return W_est
 
 @FUSION_LAYERS.register_module()
 class FusionNN(BaseModule):
@@ -229,12 +253,13 @@ class FusionNN(BaseModule):
     """
     def __init__(self,
                 in_channels,
+                out_channels,
                 init_cfg=None):
         super(FusionNN, self).__init__(init_cfg=init_cfg)
 
         self.fuse_conv = ConvModule(
                                 in_channels=in_channels,
-                                out_channels=in_channels,
+                                out_channels=out_channels,
                                 kernel_size=1,
                                 padding=0,
                                 conv_cfg=dict(type='Conv2d'),
@@ -270,8 +295,9 @@ class FusionSummation(BaseModule):
     def forward(self, feats, adj_matrix):  
         fuse_out = [] 
         for i in range(len(adj_matrix)):
-            sample = torch.mm(adj_matrix[i], feats[i])
-            fuse_out.append(sample)
+            C,H,W = feats[i].size()
+            sample = torch.mm(adj_matrix[i], feats[i].view(C,-1))
+            fuse_out.append(sample.view(C,H,W))
         fuse_out = torch.stack(fuse_out, dim=0)  
         # print(f"fusion_layer/fuse_out: {fuse_out.size()}")  
            
@@ -291,12 +317,13 @@ class FusionGNN(BaseModule):
     """
     def __init__(self,
                 in_channels,
+                out_channels,
                 init_cfg=None):
         super(FusionGNN, self).__init__(init_cfg=init_cfg)
                 
         self.fuse_gconv = GCNConv(
                                 in_channels = in_channels,
-                                out_channels = in_channels,
+                                out_channels = out_channels,
                                 bias = True, 
                                 normalize=True)
         
@@ -305,8 +332,10 @@ class FusionGNN(BaseModule):
         for i in range(len(adj_matrix)):
             edge_index, edge_weights = dense_to_sparse(adj_matrix[i])
             # print(f"fusion_layer/edge_index: {edge_index}")
-            sample = self.fuse_gconv(feats[i].T, edge_index, edge_weights)
-            fuse_out.append(sample)
+            
+            C,H,W = feats[i].size()
+            sample = self.fuse_gconv(feats[i].view(C,-1).T, edge_index, edge_weights)
+            fuse_out.append(sample.T.view(C,H,W))
         fuse_out = torch.stack(fuse_out, dim=0)  
         # print(f"fusion_layer/fuse_out: {fuse_out.size()}")  
            
@@ -331,7 +360,7 @@ class FusionNeck(BaseModule):
         super(FusionNeck, self).__init__(init_cfg=init_cfg)
 
         self.fuse_conv = ConvModule(
-                                in_channels=in_channels+in_channels,
+                                in_channels=in_channels,
                                 out_channels=out_channels,
                                 kernel_size=1,
                                 padding=0,
