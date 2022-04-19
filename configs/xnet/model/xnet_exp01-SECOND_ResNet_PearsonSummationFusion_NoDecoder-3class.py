@@ -4,18 +4,22 @@ _base_ = [
 
 model = dict(
     # 特征级别融合网络 Feature Fusion
-    fusion_layer=dict(
-        pre_fusion=dict(
-            img_out_channels=128,
-            pts_out_channels=128),
-        get_graph=dict(
-            _delete_=True,
-            type='GetGraphPearson',
-            correlation_limit=0.8),
-        fusion=dict(
-            _delete_=True,
-            type='FusionSummation',
-            in_channels=128+128),
-        fusion_neck=dict(
-            in_channels=128+128)),
+    pre_fusion=dict(
+        img_out_channels=64,
+        pts_out_channels=64),    
+    # get_graph=dict(
+    #     _delete_=True,
+    #     type='GetGraphRandom'),
+    get_graph=dict(
+        _delete_=True,
+        type='GetGraphNN',
+        in_channel=64+64),  
+    fusion=dict(
+        _delete_=True,
+        type='FusionGNN',
+        in_channels=64+64,
+        out_channels=64+64),
+    fusion_neck=dict(
+        in_channels=64+64)
+
 )

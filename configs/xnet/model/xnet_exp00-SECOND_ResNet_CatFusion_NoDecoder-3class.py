@@ -4,8 +4,6 @@ _base_ = [
     ]
 
 model = dict(
-    type='XNet',
-    
     # 图像特征提取 Image Feature Extraction
     img_backbone=dict(
         _delete_=True,
@@ -25,27 +23,27 @@ model = dict(
         num_outs=2),
 
     # 特征级别融合网络 Feature Fusion
-    fusion_layer=dict(
+    pre_fusion=dict(
         _delete_=True,
-        type='XnetFusion',
-        pre_fusion=dict(
-            type='PreFusionCat',
-            img_channels=512,
-            img_out_channels=512,
-            pts_channels=512,
-            pts_out_channels=512,
-            img_levels=2,
-            pts_levels=1,
-            dropout_ratio=0.2), 
-        get_graph=None,
-        fusion=dict(
-            type='FusionNN',
-            in_channels=512+512,
-            out_channels=512),
-        fusion_neck=dict(
-            type='FusionNeck',
-            in_channels=512,
-            out_channels=128)),
+        type='PreFusionCat',
+        img_channels=512,
+        img_out_channels=512,
+        pts_channels=512,
+        pts_out_channels=512,
+        img_levels=2,
+        pts_levels=1,
+        dropout_ratio=0.2), 
+    get_graph=None,
+    fusion=dict(
+        _delete_=True,
+        type='FusionNN',
+        in_channels=512+512,
+        out_channels=512),
+    fusion_neck=dict(
+        _delete_=True,
+        type='FusionNeckNN',
+        in_channels=512,
+        out_channels=128),
     
     pts_bbox_head=dict(
         feat_channels=128)

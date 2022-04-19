@@ -29,7 +29,9 @@ class XNet(Base3DDetector):
                  pts_neck=None,
                  img_backbone=None,
                  img_neck=None,
-                 fusion_layer=None,
+                 pre_fusion=None,  
+                 get_graph=None,
+                 fusion=None,
                  fusion_neck=None,
                  decoder=None,
                  pts_bbox_head=None,
@@ -62,11 +64,18 @@ class XNet(Base3DDetector):
             self.img_neck = builder.build_neck(img_neck)
 
         # 特征级别融合网络 Feature Fusion
-        if fusion_layer:
+        if pre_fusion:
+            self.pre_fusion_layer = builder.build_fusion_layer(
+                pre_fusion)
+        if get_graph:
+            self.get_graph_layer = builder.build_fusion_layer(
+                get_graph)
+        if fusion:
             self.fusion_layer = builder.build_fusion_layer(
-                fusion_layer)
+                fusion)
         if fusion_neck:
-            self.fusion_neck = builder.build_neck(fusion_neck)
+            self.fusion_neck_layer = builder.build_fusion_layer(
+                fusion_neck)
 
         # 融合网路解码器
         # if decoder:
@@ -150,6 +159,18 @@ class XNet(Base3DDetector):
         """bool: Whether the detector has a fusion layer."""
         return hasattr(self,
                        'fusion_layer') and self.fusion_layer is not None
+    
+    @property
+    def with_get_graph_layer(self):
+        """bool: Whether the fusion layer need graph."""
+        return hasattr(self,
+                       'get_graph_layer') and self.get_graph_layer is not None
+
+    @property
+    def with_fusion_neck_layer(self):
+        """bool: Whether the fusion layer need graph."""
+        return hasattr(self,
+                       'fusion_neck_layer') and self.fusion_neck_layer is not None
 
     @property
     def with_img_neck(self):
@@ -211,14 +232,20 @@ class XNet(Base3DDetector):
         pts_feats = self.extract_pts_feat(points)
         if self.with_img_backbone:
             img_feats = self.extract_img_feat(img, img_metas)
-            if self.with_fusion:
-                fuse_out = [self.fusion_layer(img_feats, pts_feats)]
-                # print(f"xnet/fusion_layer: {[x.size() for x in fuse_out]}")
-                torch.cuda.empty_cache() 
-                return fuse_out, fuse_out
+            feats = self.pre_fusion_layer(img_feats, pts_feats)
+            
+            if self.with_get_graph_layer:
+                adj_matrix = self.get_graph_layer(feats)
+                fuse_out = self.fusion_layer(feats, adj_matrix)
+            else:
+                fuse_out = self.fusion_layer(feats)
+                
+            fuse_out = self.fusion_neck_layer(fuse_out)
+            # print(f"xnet/fusion_layer: {[x.size() for x in fuse_out]}")
+            return None, [fuse_out]
         else:
             img_feats=None
-        return img_feats, pts_feats
+            return img_feats, pts_feats
 
     @torch.no_grad()
     @force_fp32()

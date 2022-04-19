@@ -217,6 +217,12 @@ ps -ef | grep yanghao+.*train.py | grep -v grep |cut -c 9-15 | xargs kill
 
 接下来是继续增加模块，进行实验。
 
+### 日志13
+
+经过一段时间的实验，可以确定的是根据x得到的邻接矩阵很难很好的指导网络融合，还是需要可训练参数在其中。
+
+所以对于新的模型邻接矩阵的预测有两种，第一种是使用深度学习网络直接预测邻接矩阵，第二种是添加邻接矩阵部分的损失函数。
+
 ## 补充说明
 
 |模块|PreFusionCat|GetGraphPearson|FusionNN|FusionSummation|FusionGNN|FusionNeck|

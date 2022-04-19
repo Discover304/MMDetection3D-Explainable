@@ -33,7 +33,10 @@ model = dict(
         out_channels=[256, 256]),
 
     # 特征级别融合网络 Feature Fusion
-    fusion_layer=None,
+    pre_fusion=None,
+    get_graph=None,
+    fusion=None,
+    fusion_neck=None,
 
     # 解码器
     decoder=None,

@@ -4,8 +4,7 @@ _base_ = [
 
 model = dict(
     # 特征级别融合网络 Feature Fusion
-    fusion_layer=dict(
-        get_graph=dict(
-            _delete_=True,
-            type='GetGraphNoTear'))
+    get_graph=dict(
+        _delete_=True,
+        type='GetGraphNoTear')
 )
