@@ -7,12 +7,15 @@ from torch.nn import functional as F
 import torchvision
 
 from mmcv.cnn import ConvModule
+from torch_geometric.nn import GCNConv
+from torch_geometric.utils import dense_to_sparse
 
 
-from .notears.nonlinear import NotearsMLP, notears_nonlinear
-
+from .notears.linear import notears_linear
 from ..builder import FUSION_LAYERS
 
+
+"""Pre Fusion"""
 @FUSION_LAYERS.register_module()
 class PreFusionCat(nn.Module):     
     """Concate features of pts and img
@@ -115,7 +118,8 @@ class PreFusionCat(nn.Module):
         # print(f"fusion_layer/mlvl_feats: {mlvl_feats.size()}")
         return mlvl_feats
 
- 
+
+"""Get Graph"""
 @FUSION_LAYERS.register_module()
 class GetGraphRandom(nn.Module):
     """get adj matirx in random
@@ -169,7 +173,7 @@ class GetGraphPearson(nn.Module):
 
 
 @FUSION_LAYERS.register_module()
-class GetGraphNoTear(nn.Module):
+class GetGraphNoTearLinear(nn.Module):
     """get adj matirx via no tear 
 
     Return:
@@ -181,11 +185,10 @@ class GetGraphNoTear(nn.Module):
 
     def forward(self, cat_feats):    
         N, C, H, W = cat_feats.size()
-        model = NotearsMLP(dims=[C, H*W, 1], bias=True)
-        # model = model.cuda()
-        W_est = notears_nonlinear(model, cat_feats.view(N,C,-1,1), lambda1=0.01, lambda2=0.01, max_iter= 10)
-        print(f"fusion_layer/notear_w: {W_est}")
+        W_est = notears_linear(cat_feats.view(N,C,-1,1), lambda1=0.1, loss_type='l2')
+        # print(f"fusion_layer/notear_w: {W_est}")
         return W_est
+
 
 @FUSION_LAYERS.register_module()
 class GetGraphNN(nn.Module):
@@ -211,6 +214,25 @@ class GetGraphNN(nn.Module):
         N, C, _, _ = cat_feats.size()
         return self.model(cat_feats).view(N,C,C)
 
+
+@FUSION_LAYERS.register_module()
+class GetGraphCNN(nn.Module):
+    """get adj matirx via NN 
+
+    Return:
+        List[torch.Tensor]: if set correlation limit a value (less than 1) it will return a adj matrix with 0s and 1s, if set to none it will return a list of correlation matirx for each sample.
+        
+    """
+    def __init__(self,
+                in_channel):
+        super(GetGraphNN, self).__init__()
+        pass
+        
+    def forward(self, cat_feats):
+        pass
+
+
+"""Fusion"""
 @FUSION_LAYERS.register_module()
 class FusionNN(nn.Module):
     """fuse input feature with no adj matrix
@@ -308,6 +330,64 @@ class FusionGNN(nn.Module):
         return fuse_out
 
 
+@FUSION_LAYERS.register_module()
+class FusionGCN(nn.Module):
+    """fuse input feature by GCN
+
+    Args:
+        in_channels (int): in channels, 
+        
+    Return:
+        torch.Tensor: features.
+    """
+    def __init__(self,
+                in_channels,
+                out_channels):
+        super(FusionGCN, self).__init__()
+        self.conv1 = GCNConv(in_channels, in_channels)
+        self.conv2 = GCNConv(in_channels, out_channels)
+
+    def forward(self, feats, adj_matrix):  
+        N,C,H,W = feats.size()
+        edge_index = []
+        edge_weights = []
+        for i in range(N):
+            ei, ew = dense_to_sparse(adj_matrix[i])
+            # print(f"fusion_layer/edge_index: {edge_index}")
+            edge_index.append(ei)
+            edge_weights.append(ew)
+            
+        x = self.conv1(feats.view(N,C,-1).permute(0,2,1), edge_index, edge_weights)
+        x = F.relu(x)
+        x = F.dropout(x, training=self.training)
+        x = self.conv2(x, edge_index, edge_weights)
+        fuse_out = x.permute(0,2,1).view(N,C,H,W)
+        # print(f"fusion_layer/fuse_out: {fuse_out.size()}")  
+
+        return fuse_out
+
+
+@FUSION_LAYERS.register_module()
+class FusionMarkov(nn.Module):
+    """fuse input feature by deep GNN
+
+    Args:
+        in_channels (int): in channels, 
+        
+    Return:
+        torch.Tensor: features.
+    """
+    def __init__(self,
+                in_channels,
+                out_channels):
+        super(FusionMarkov, self).__init__()
+        pass
+
+    def forward(self, feats, adj_matrix):  
+        pass
+
+
+"""Fusion Neck"""
 @FUSION_LAYERS.register_module()
 class FusionNeckNN(nn.Module):
     """process the fused feature to desired shape of down stream process
