@@ -5,6 +5,6 @@ _base_ = [
 model = dict(
     get_graph=dict(
         _delete_=True,
-        type='GetGraphPearson',
+        type='GetGraphDAG',
         in_channel=64+64)
 )

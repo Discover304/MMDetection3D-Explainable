@@ -37,6 +37,7 @@ class XNet(Base3DDetector):
                  pts_bbox_head=None,
                  img_rpn_head=None,
                  img_roi_head=None,
+                 net_loss=None,
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None,
@@ -98,6 +99,10 @@ class XNet(Base3DDetector):
         if img_roi_head is not None:
             self.img_roi_head = builder.build_head(img_roi_head)
 
+        # 网络损失
+        if net_loss is not None:
+            self.net_loss = builder.build_loss(net_loss)
+        
         # 训练/测试配置 Train/Test config
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
@@ -192,6 +197,11 @@ class XNet(Base3DDetector):
         """bool: Whether the detector has a RoI Head in image branch."""
         return hasattr(self, 'img_roi_head') and self.img_roi_head is not None
 
+    @property
+    def with_net_loss(self):
+        """bool: Whether the detector has a loss related to structure."""
+        return hasattr(self, 'net_loss') and self.net_loss is not None
+
     def extract_img_feat(self, img, img_metas):
         """Extract features of images."""
         if self.with_img_backbone and img is not None:
@@ -220,16 +230,25 @@ class XNet(Base3DDetector):
         voxel_features = self.pts_voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0].item() + 1
         pts_feats = self.pts_middle_encoder(voxel_features, coors, batch_size)
-        pts_feats = self.pts_backbone(pts_feats)
+        
+        pts_feats, net_info = self.pts_backbone(pts_feats)
+        
         # print(f"xnet/pts_backbone: {[x.size() for x in pts_feats]}")
         if self.with_pts_neck:
             pts_feats = self.pts_neck(pts_feats)
             # print(f"xnet/pts_neck: {[x.size() for x in pts_feats]}")
-        return pts_feats
+        if not self.with_net_loss:
+            return pts_feats
+        else:
+            return pts_feats, net_info
+        
 
     def extract_feat(self, points, img, img_metas):
         """Extract features from images and points."""
-        pts_feats = self.extract_pts_feat(points)
+        if not self.with_net_loss:
+            pts_feats = self.extract_pts_feat(points)
+        else:
+            pts_feats, net_info = self.extract_pts_feat(points)
         if self.with_img_backbone:
             img_feats = self.extract_img_feat(img, img_metas)
             feats = self.pre_fusion_layer(img_feats, pts_feats)
@@ -240,12 +259,24 @@ class XNet(Base3DDetector):
             else:
                 fuse_out = self.fusion_layer(feats)
                 
+            fuse_out = torch.concat(fuse_out, dim=1)
+            # print(f"xnet/fusion_layer: {fuse_out.size()}")
+
+            fuse_out = torch.concat((feats, fuse_out), dim=1)
+            # print(f"xnet/fusion_layer: {fuse_out.size()}")
+
+            
             fuse_out = self.fusion_neck_layer(fuse_out)
-            # print(f"xnet/fusion_layer: {[x.size() for x in fuse_out]}")
-            return None, [fuse_out]
+            # print(f"xnet/fusion_layer: {fuse_out.size()}")
+            if not self.with_net_loss:
+                return None, [fuse_out]
+            else:
+                return None, [fuse_out], net_info
         else:
-            img_feats=None
-            return img_feats, pts_feats
+            if not self.with_net_loss:
+                return None, pts_feats
+            else:
+                return None, pts_feats, net_info
 
     @torch.no_grad()
     @force_fp32()
@@ -301,13 +332,23 @@ class XNet(Base3DDetector):
         Returns:
             dict: Losses of different branches.
         """
-        img_feats, pts_feats = self.extract_feat(
-            points, img=img, img_metas=img_metas)
         losses = dict()
+        
+        if not self.with_net_loss:
+            img_feats, pts_feats = self.extract_feat(
+                points, img=img, img_metas=img_metas)
+        else:
+            img_feats, pts_feats, net_info = self.extract_feat(
+                points, img=img, img_metas=img_metas)
+            losses_net = self.forward_net_train(net_info) # list of middle layer output
+            # print(f"xnet/train_forward/losses_net: {losses_net}")
+            losses.update(losses_net)
+            
         if pts_feats:
             losses_pts = self.forward_pts_train(pts_feats, gt_bboxes_3d,
                                                 gt_labels_3d, img_metas,
                                                 gt_bboxes_ignore)
+            # print(f"xnet/train_forward/losses_pts: {losses_pts}")
             losses.update(losses_pts)
         if img_feats:
             losses_img = self.forward_img_train(
@@ -401,6 +442,11 @@ class XNet(Base3DDetector):
 
         return losses
 
+    def forward_net_train(self,layer_info):
+        losses = self.net_loss(layer_info)
+        return losses
+    
+    
     def simple_test_img(self, x, img_metas, proposals=None, rescale=False):
         """Test without augmentation."""
         if proposals is None:
@@ -432,8 +478,12 @@ class XNet(Base3DDetector):
 
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
-        img_feats, pts_feats = self.extract_feat(
-            points, img=img, img_metas=img_metas)
+        if not self.with_net_loss:
+            img_feats, pts_feats = self.extract_feat(
+                points, img=img, img_metas=img_metas)
+        else:
+            img_feats, pts_feats, net_info = self.extract_feat(
+                points, img=img, img_metas=img_metas)
 
         bbox_list = [dict() for i in range(len(img_metas))]
         if pts_feats and self.with_pts_bbox:

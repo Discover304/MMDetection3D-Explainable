@@ -1,18 +1,18 @@
 from ntpath import join
+from xml.etree.ElementInclude import include
 
 from pkg_resources import require
+# from mmdet3d.models.fusion_layers.notears.nonlinear import notears_nonlinear, NotearsMLP
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
 import torchvision
 
 from mmcv.cnn import ConvModule
-from torch_geometric.nn import GCNConv
-from torch_geometric.utils import dense_to_sparse
-
-
-from .notears.linear import notears_linear
+from .notears.nonlinear_gpu_ver import notears_nonlinear
+# from .notears.linear import notears_linear
 from ..builder import FUSION_LAYERS
+from .notears.utils import set_random_seed, simulate_dag
 
 
 """Pre Fusion"""
@@ -145,52 +145,6 @@ class GetGraphRandom(nn.Module):
 
 
 @FUSION_LAYERS.register_module()
-class GetGraphPearson(nn.Module):
-    """get adj matirx via pearson 
-
-    Args:
-        correlation_limit (float, optional): The threshold of edge values, Defaults to 0.8.
-        
-    Return:
-        List[torch.Tensor]: if set correlation limit a value (less than 1) it will return a adj matrix with 0s and 1s, if set to none it will return a list of correlation matirx for each sample.
-        
-    """
-    def __init__(self):
-        super(GetGraphPearson, self).__init__()
-        
-        # self.coefficient = torch.nn.Parameter(torch.Tensor([0.001]))
-
-    def forward(self, cat_feats):    
-        correlations = []
-        for sample in cat_feats:
-            C,_,_ = sample.size()
-            # print(f"fusion_layer/sample: {sample}")
-            correlation = torch.corrcoef(sample.view(C,-1))
-            # print(f"fusion_layer/correlation: {correlation}")
-            # 确保相关性矩阵没有问题。
-            correlations.append(abs(correlation)-torch.eye(C, device=correlation.get_device()))
-        return correlations
-
-
-@FUSION_LAYERS.register_module()
-class GetGraphNoTearLinear(nn.Module):
-    """get adj matirx via no tear 
-
-    Return:
-        List[torch.Tensor]: if set correlation limit a value (less than 1) it will return a adj matrix with 0s and 1s, if set to none it will return a list of correlation matirx for each sample.
-        
-    """
-    def __init__(self):
-        super(GetGraphNoTear, self).__init__()
-
-    def forward(self, cat_feats):    
-        N, C, H, W = cat_feats.size()
-        W_est = notears_linear(cat_feats.view(N,C,-1,1), lambda1=0.1, loss_type='l2')
-        # print(f"fusion_layer/notear_w: {W_est}")
-        return W_est
-
-
-@FUSION_LAYERS.register_module()
 class GetGraphNN(nn.Module):
     """get adj matirx via NN 
 
@@ -207,29 +161,102 @@ class GetGraphNN(nn.Module):
         
         self.model = nn.Sequential(
                 resnet18,
-                nn.Linear(1000, in_channel**2)
+                nn.Linear(1000, in_channel**2),
+                nn.ReLU(inplace=True)
             )
+        
+        # # 如果不训练，那就加上这一部分。
+        # for param in self.parameters():
+        #     param.requires_grad = False
         
     def forward(self, cat_feats):
         N, C, _, _ = cat_feats.size()
-        return self.model(cat_feats).view(N,C,C)
+        W = self.model(cat_feats).view(N,C,C)
+        mask = torch.ones(C,C, device = W.device) - torch.eye(C, device = W.device)
+        W = torch.where(mask==1, W, mask)
+        # print(W, W.size(), torch.count_nonzero(W))
+        return W
 
 
 @FUSION_LAYERS.register_module()
-class GetGraphCNN(nn.Module):
-    """get adj matirx via NN 
+class GetGraphPearson(nn.Module):
+    """get adj matirx via pearson 
 
+    Args:
+        correlation_limit (float, optional): The threshold of edge values, Defaults to 0.8.
+        
     Return:
         List[torch.Tensor]: if set correlation limit a value (less than 1) it will return a adj matrix with 0s and 1s, if set to none it will return a list of correlation matirx for each sample.
         
     """
     def __init__(self,
-                in_channel):
-        super(GetGraphNN, self).__init__()
-        pass
+                 in_channel):
+        super(GetGraphPearson, self).__init__()
+        self.model = torchvision.models.resnet18()
+        self.model.conv1= nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,bias=False)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, cat_feats):   
+        N, C, H, W = cat_feats.size()
+        cat_feats = cat_feats.view(N*C,1,H,W)
+        feats = self.model(cat_feats).view(N,C,1000)
+        mask = torch.ones(C,C, device = feats.device) - torch.eye(C, device = feats.device)
+
+        W_est = [] 
+        for feat in feats:
+            # print(f"fusion_layer/feat: {feat}")
+            W = torch.corrcoef(feat)
+            # print(f"fusion_layer/correlation: {W}")
+            # 确保相关性矩阵没有问题。
+            W = torch.where(mask==1, W, mask)
+            W = self.relu(W)
+            # print(W, W.size(), torch.count_nonzero(W))
+            W_est.append(W)
+        return W_est
+
+
+@FUSION_LAYERS.register_module()
+class GetGraphDAG(nn.Module):
+    """get adj matirx via no tear 
+
+    Return:
+        List[torch.Tensor]: if set correlation limit a value (less than 1) it will return a adj matrix with 0s and 1s, if set to none it will return a list of correlation matirx for each sample.
         
-    def forward(self, cat_feats):
-        pass
+    """
+    def __init__(self, in_channel):
+        super(GetGraphDAG, self).__init__()
+        self.model = torchvision.models.resnet18()
+        self.model.conv1= nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,bias=False)
+        # self.linear = nn.Linear(1000, in_channel)
+        # self.W = simulate_dag(in_channel, (in_channel*in_channel)//4, 'ER')
+        # self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, cat_feats):   
+        N, C, H, W = cat_feats.size()
+        cat_feats = cat_feats.view(N*C,1,H,W)
+        feats = self.model(cat_feats).view(N,C,1000)
+        # out = self.linear(feats.view(N*C,1000)).view(N,C,C)
+        # mask = torch.ones(C,C, device = feats.device) - torch.eye(C, device = feats.device)
+
+        W_est = [] 
+        device = cat_feats.device
+        for i in range(N):
+            # print(f"fusion_layer/feat: {feat}")
+            # W = self.W
+            # W = notears_nonlinear(NotearsMLP(dims=[C, 20, 1], bias=True), feats[i].T.cpu(), lambda1=0.01, lambda2=0.01)
+            # print("input feats: ",feats[i], feats[i].size(), torch.count_nonzero(feats[i]))
+            W = notears_nonlinear(feats[i].T.cpu().detach().numpy(), feats[i].T, use_gpu=device, max_iter=100)
+            # W = notears_linear(feats[i].T.cpu().detach().numpy(), lambda1=0.1, loss_type='logistic')
+            W = torch.tensor(W, device=device).float()
+            # print(f"fusion_layer/correlation: {W}")
+            # 确保相关性矩阵没有问题。
+            # W = torch.where(mask==1, W, mask)
+            # W = self.relu(W)
+            # print("output W: ", W, W.size(), torch.count_nonzero(W))
+            # W = torch.where(W>(1000/(C*C)), out[i], torch.zeros(C,C,device=device))
+            W_est.append(W)
+            # torch.where(W>0.8, out[i], torch.zeros(C,C))
+        return W_est
 
 
 """Fusion"""
@@ -305,34 +332,58 @@ class FusionGNN(nn.Module):
                 out_channels):
         super(FusionGNN, self).__init__()
 
-        self.conv = ConvModule(
-                        in_channels=in_channels,
-                        out_channels=out_channels,
-                        kernel_size=1,
-                        padding=0,
-                        conv_cfg=dict(type='Conv2d'),
-                        norm_cfg=dict(type='BN2d'),
-                        act_cfg=dict(type='ReLU'),
-                        bias=True,
-                        inplace=True)
+        self.layers=nn.ModuleList([
+            ConvModule(
+                in_channels=in_channels,
+                out_channels=in_channels,
+                kernel_size=1,
+                padding=0,
+                conv_cfg=dict(type='Conv2d'),
+                norm_cfg=dict(type='BN2d'),
+                act_cfg=dict(type='ReLU'),
+                bias=True,
+                inplace=True),
+            ConvModule(
+                in_channels=in_channels,
+                out_channels=in_channels,
+                kernel_size=1,
+                padding=0,
+                conv_cfg=dict(type='Conv2d'),
+                norm_cfg=dict(type='BN2d'),
+                act_cfg=dict(type='ReLU'),
+                bias=True,
+                inplace=True),
+            ConvModule(
+                in_channels=in_channels,
+                out_channels=in_channels,
+                kernel_size=1,
+                padding=0,
+                conv_cfg=dict(type='Conv2d'),
+                norm_cfg=dict(type='BN2d'),
+                act_cfg=dict(type='ReLU'),
+                bias=True,
+                inplace=True)])
 
     def forward(self, feats, adj_matrix):  
         N,C,H,W = feats.size()
-        feats = self.conv(feats)
         fuse_out = []
-        for i in range(len(adj_matrix)):
-            m = adj_matrix[i] + torch.eye(C, device=adj_matrix.device)
-            x = torch.mm(m, feats[i].view(C,-1))
-            fuse_out.append(x.view(C,H,W))
-        fuse_out = torch.stack(fuse_out, dim=0)  
+        for layer in self.layers:
+            feats = layer(feats)
+            layer_out = []
+            for i in range(len(adj_matrix)):
+                m = adj_matrix[i]
+                x = torch.sparse.mm(m.to_sparse(), feats[i].view(C,-1))
+                layer_out.append(x.view(C,H,W))
+            feats = torch.stack(layer_out, dim=0)  
+            fuse_out.append(feats)
         # print(f"fusion_layer/fuse_out: {fuse_out.size()}")  
            
         return fuse_out
 
 
 @FUSION_LAYERS.register_module()
-class FusionGCN(nn.Module):
-    """fuse input feature by GCN
+class FusionMarkovGNN(nn.Module):
+    """solve each graph with fuse input feature by deep GNN
 
     Args:
         in_channels (int): in channels, 
@@ -342,49 +393,104 @@ class FusionGCN(nn.Module):
     """
     def __init__(self,
                 in_channels,
-                out_channels):
-        super(FusionGCN, self).__init__()
-        self.conv1 = GCNConv(in_channels, in_channels)
-        self.conv2 = GCNConv(in_channels, out_channels)
+                out_channels,
+                slice = 20):
+        super(FusionMarkovGNN, self).__init__()
+        self.slice = slice
+        self.layers=nn.ModuleList([
+            ConvModule(
+                in_channels=in_channels*slice,
+                out_channels=in_channels,
+                kernel_size=1,
+                padding=0,
+                conv_cfg=dict(type='Conv2d'),
+                norm_cfg=dict(type='BN2d'),
+                act_cfg=dict(type='ReLU'),
+                bias=True,
+                inplace=True),
+            ConvModule(
+                in_channels=in_channels*slice,
+                out_channels=in_channels,
+                kernel_size=1,
+                padding=0,
+                conv_cfg=dict(type='Conv2d'),
+                norm_cfg=dict(type='BN2d'),
+                act_cfg=dict(type='ReLU'),
+                bias=True,
+                inplace=True),
+            ConvModule(
+                in_channels=in_channels*slice,
+                out_channels=in_channels,
+                kernel_size=1,
+                padding=0,
+                conv_cfg=dict(type='Conv2d'),
+                norm_cfg=dict(type='BN2d'),
+                act_cfg=dict(type='ReLU'),
+                bias=True,
+                inplace=True)])
 
+    def get_markov_sub(self, m, slice = 20):
+        C,_  = m.size()
+        # print([m, m.size(), torch.count_nonzero(m)])
+        # i = torch.eye(C, device = m.device)
+        # m = m+i
+        ms = []
+        for i in range(C):
+            ms.append(torch.where(m[i]>0, m, torch.zeros(C,C,device = m.device)))
+        mss = []
+        slice_size = C//slice
+        for i in range(slice):
+            mss.append(torch.max(torch.stack(ms[slice_size*i:slice_size*(i+1)]), dim = 0).values)
+        # print([[m, m.size(), torch.count_nonzero(m)] for m in mss])
+        return torch.stack(mss)
+                
     def forward(self, feats, adj_matrix):  
         N,C,H,W = feats.size()
-        edge_index = []
-        edge_weights = []
+        # C, C = adj_matrix.size()
+        S = self.slice
+        mss = []
         for i in range(N):
-            ei, ew = dense_to_sparse(adj_matrix[i])
-            # print(f"fusion_layer/edge_index: {edge_index}")
-            edge_index.append(ei)
-            edge_weights.append(ew)
-            
-        x = self.conv1(feats.view(N,C,-1).permute(0,2,1), edge_index, edge_weights)
-        x = F.relu(x)
-        x = F.dropout(x, training=self.training)
-        x = self.conv2(x, edge_index, edge_weights)
-        fuse_out = x.permute(0,2,1).view(N,C,H,W)
-        # print(f"fusion_layer/fuse_out: {fuse_out.size()}")  
-
-        return fuse_out
-
-
-@FUSION_LAYERS.register_module()
-class FusionMarkov(nn.Module):
-    """fuse input feature by deep GNN
-
-    Args:
-        in_channels (int): in channels, 
+            m = adj_matrix[i]
+            ms = self.get_markov_sub(m, slice = S)
+            mss.append(ms)
+        mss = torch.stack(mss) # (N,S,C,C)
+           
+        fuse_out = []
+        for layer in self.layers:
+            layer_out = []
+            for i in range(len(adj_matrix)):
+                ms = mss[i].view(S*C,C) # (S*C,C)
+                feat = feats[i].view(C,H*W)
+                x = torch.sparse.mm(ms.to_sparse(), feat) # (S*C,H*W)
+                # x = torch.max(x, dim=0).values
+                layer_out.append(x.view(S,C,H,W))
+            feats = torch.stack(layer_out, dim=0) # (N,S,C,H,W)
+            feats = layer(feats.view(N,S*C,H,W)) # (N,C,H,W)
+            fuse_out.append(feats)
         
-    Return:
-        torch.Tensor: features.
-    """
-    def __init__(self,
-                in_channels,
-                out_channels):
-        super(FusionMarkov, self).__init__()
-        pass
-
-    def forward(self, feats, adj_matrix):  
-        pass
+        
+        # mss = [] 
+        # for i in range(N):
+        #     m = adj_matrix[i]
+        #     ms = self.get_markov_sub(m, slice = S)
+        #     mss.append(ms)
+        # mss = torch.stack(mss) # (N,S,C,C)
+           
+        # fuse_out = []
+        # for layer in self.layers:
+        #     layer_out = []
+        #     for i in range(len(adj_matrix)):
+        #         ms = mss[i].view(S*C,C) # (S*C,C)
+        #         feat = feats[i].view(C,H*W)
+        #         x = torch.sparse.mm(ms.to_sparse(), feat) # (S*C,H*W)
+        #         # x = torch.max(x, dim=0).values
+        #         layer_out.append(x.view(S,C,H,W))
+        #     feats = torch.stack(layer_out, dim=0) # (N,S,C,H,W)
+        #     feats = layer(feats.view(N,S*C,H,W)) # (N,C,H,W)
+        #     fuse_out.append(feats)
+        # print(f"fusion_layer/fuse_out: {fuse_out.size()}")  
+           
+        return fuse_out
 
 
 """Fusion Neck"""

@@ -1,11 +1,11 @@
 from .x_net_fusion_layers import (PreFusionCat, 
-                                  GetGraphRandom, GetGraphPearson, GetGraphNoTearLinear, GetGraphNN, 
-                                  FusionNN, FusionSummation, FusionGNN, FusionGCN, 
+                                  GetGraphRandom, GetGraphPearson, GetGraphDAG, GetGraphNN, 
+                                  FusionNN, FusionSummation, FusionGNN, FusionMarkovGNN,
                                   FusionNeckNN)
 
 __all__ = [
     'PreFusionCat', 
-    'GetGraphRandom', 'GetGraphPearson', 'GetGraphNoTearLinear', 'GetGraphNN', 
-    'FusionNN', 'FusionSummation', 'FusionGNN', 'FusionGCN', 
+    'GetGraphRandom', 'GetGraphPearson', 'GetGraphDAG', 'GetGraphNN', 
+    'FusionNN', 'FusionSummation', 'FusionGNN', 'FusionMarkovGNN',
     'FusionNeckNN' 
 ]

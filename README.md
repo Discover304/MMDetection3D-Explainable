@@ -187,6 +187,8 @@ Pearson相关矩阵
 释放引后台脚本占用的GPU
 ```bash
 ps -ef | grep yanghao+.*train.py | grep -v grep |cut -c 9-15 | xargs kill
+
+ps -ef | grep 【进程名正则表达式】 | grep -v grep |cut -c 9-15 | xargs kill -9
 ```
 
 - 第一版PearsonFusion：将高相关性的通道剔除，保留相互独立的通道。
@@ -223,6 +225,31 @@ ps -ef | grep yanghao+.*train.py | grep -v grep |cut -c 9-15 | xargs kill
 
 所以对于新的模型邻接矩阵的预测有两种，第一种是使用深度学习网络直接预测邻接矩阵，第二种是添加邻接矩阵部分的损失函数。
 
+### 日志14
+
+修改了torch geometric库中加载模型参数的部分。
+
+![](https://image.discover304.top/blog-img/s10432504222022-2022422104325.png)
+
+因为在第17轮后模型开始过拟合，所以我们尝试固定图预测部分的神经网络参数，重新开始训练模型其他部分。
+
+下一步考虑多尺度特征图，不仅仅是考虑融合后的结果。
+
+注：下表中的每一个epoch的数字几乎没有价值，因为是加载了预训练模型参数的。
+
+|实验标签|表现最优模型|Overall bbox A40 moderate|Car bbox AP40 moderate|实验描述|
+|-|-|-|-|-|
+|xnet_base|epoch_37|83.4838|92.7984|点云单模态SECOND|
+|xnet_exp00|epoch_2|81.1241|92.1264|多模态特征通道拼接|
+|xnet_exp01|epoch_21|68.3767|79.8669|多模态特征GCN|
+|xnet_exp01_1|epoch_5|72.0928|79.0513|多模态特征GCN+freeze|
+|xnet_exp01_2|epoch_14|47.8480|26.4355|多模态特征提取GCN+FPN|
+|xnet_exp01_3/4|epoch_NA|NA|NA|多模态特征提取DGCN+DFPN|
+
+### 日志15
+
+因为notear方法的开销是因为cpu叉乘，我们可以先减小每一个通道的大小，然后再进行运算。
+
 ## 补充说明
 
 |模块|PreFusionCat|GetGraphPearson|FusionNN|FusionSummation|FusionGNN|FusionNeck|
@@ -231,7 +258,6 @@ ps -ef | grep yanghao+.*train.py | grep -v grep |cut -c 9-15 | xargs kill
 |exp00|✅||✅|||✅|
 |exp01|✅|✅||✅||✅|
 |exp02|✅|✅|||✅|✅|
-
 
 ## 更新通知格式
 

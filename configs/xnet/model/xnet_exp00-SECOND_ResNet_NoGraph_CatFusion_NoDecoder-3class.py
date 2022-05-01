@@ -1,6 +1,6 @@
 # model settings
 _base_ = [
-    './xnet_base-SECOND_NoImg_NoFusion_NoDecoder-3class.py'
+    './xnet_base-SECOND_NoImg_NoGraph_NoFusion_NoDecoder-3class.py'
     ]
 
 model = dict(

@@ -5,3 +5,5 @@ _base_ = [
     '../_base_/schedules/cyclic_40e.py', 
     '../_base_/default_runtime.py'
     ]
+
+load_from = "work_dirs/xnet_base-kitti_3d_3class-cyclic_40e/epoch_40.pth"

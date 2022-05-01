@@ -9,7 +9,7 @@ from mmdet.models import BACKBONES
 
 
 @BACKBONES.register_module()
-class SECOND(BaseModule):
+class SECOND_INFO(BaseModule):
     """Backbone network for SECOND/PointPillars/PartA2/MVXNet.
 
     Args:
@@ -30,7 +30,7 @@ class SECOND(BaseModule):
                  conv_cfg=dict(type='Conv2d', bias=False),
                  init_cfg=None,
                  pretrained=None):
-        super(SECOND, self).__init__(init_cfg=init_cfg)
+        super(SECOND_INFO, self).__init__(init_cfg=init_cfg)
         assert len(layer_strides) == len(layer_nums)
         assert len(out_channels) == len(layer_nums)
 
@@ -40,30 +40,29 @@ class SECOND(BaseModule):
         blocks = []
         for i, layer_num in enumerate(layer_nums):
             block = [
-                build_conv_layer(
-                    conv_cfg,
-                    in_filters[i],
-                    out_channels[i],
-                    3,
-                    stride=layer_strides[i],
-                    padding=1),
-                build_norm_layer(norm_cfg, out_channels[i])[1],
-                nn.ReLU(inplace=True),
-            ]
-            for j in range(layer_num):
-                block.append(
+                nn.Sequential(
                     build_conv_layer(
                         conv_cfg,
-                        out_channels[i],
+                        in_filters[i],
                         out_channels[i],
                         3,
-                        padding=1))
-                block.append(build_norm_layer(norm_cfg, out_channels[i])[1])
-                block.append(nn.ReLU(inplace=True))
-
-            block = nn.Sequential(*block)
+                        stride=layer_strides[i],
+                        padding=1),
+                    build_norm_layer(norm_cfg, out_channels[i])[1],
+                    nn.ReLU(inplace=True))]
+            for j in range(layer_num):
+                block.append(
+                    nn.Sequential(
+                        build_conv_layer(
+                            conv_cfg,
+                            out_channels[i],
+                            out_channels[i],
+                            3,
+                            padding=1),
+                        build_norm_layer(norm_cfg, out_channels[i])[1],
+                        nn.ReLU(inplace=True)))
+            block = nn.ModuleList(block)
             blocks.append(block)
-
         self.blocks = nn.ModuleList(blocks)
 
         assert not (init_cfg and pretrained), \
@@ -85,7 +84,12 @@ class SECOND(BaseModule):
             tuple[torch.Tensor]: Multi-scale features.
         """
         outs = []
-        for i in range(len(self.blocks)):
-            x = self.blocks[i](x)
+        info = []
+        for block in self.blocks:
+            for layer in block:
+                x = layer(x)
+                info.append(x)
             outs.append(x)
-        return tuple(outs), None
+        # 计算每一个x之间的信息量差异
+        # 计算信息差的增量的方差，作为损失函数。
+        return tuple(outs), tuple(info)

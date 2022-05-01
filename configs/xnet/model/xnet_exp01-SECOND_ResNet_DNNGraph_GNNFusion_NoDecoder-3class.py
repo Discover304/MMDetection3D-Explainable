@@ -1,5 +1,5 @@
 _base_ = [
-    './xnet_exp00-SECOND_ResNet_CatFusion_NoDecoder-3class.py'
+    './xnet_exp00-SECOND_ResNet_NoGraph_CatFusion_NoDecoder-3class.py'
     ]
 
 model = dict(

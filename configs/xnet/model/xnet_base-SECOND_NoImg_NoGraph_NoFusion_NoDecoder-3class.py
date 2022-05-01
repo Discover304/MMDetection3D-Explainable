@@ -73,6 +73,9 @@ model = dict(
     img_rpn_head=None,
     img_roi_head=None,
 
+    # 其他内容
+    net_loss=None,
+
     # 训练配置 model training setting
     train_cfg=dict(
         pts=dict(
