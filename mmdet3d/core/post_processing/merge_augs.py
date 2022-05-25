@@ -1,26 +1,22 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
 
-from mmdet3d.ops.iou3d.iou3d_utils import nms_gpu, nms_normal_gpu
+from mmdet3d.core.post_processing import nms_bev, nms_normal_bev
 from ..bbox import bbox3d2result, bbox3d_mapping_back, xywhr2xyxyr
 
 
 def merge_aug_bboxes_3d(aug_results, img_metas, test_cfg):
     """Merge augmented detection 3D bboxes and scores.
-
     Args:
         aug_results (list[dict]): The dict of detection results.
             The dict contains the following keys
-
             - boxes_3d (:obj:`BaseInstance3DBoxes`): Detection bbox.
             - scores_3d (torch.Tensor): Detection scores.
             - labels_3d (torch.Tensor): Predicted box labels.
         img_metas (list[dict]): Meta information of each sample.
         test_cfg (dict): Test config.
-
     Returns:
         dict: Bounding boxes results in cpu mode, containing merged results.
-
             - boxes_3d (:obj:`BaseInstance3DBoxes`): Merged detection bbox.
             - scores_3d (torch.Tensor): Merged detection scores.
             - labels_3d (torch.Tensor): Merged predicted box labels.
@@ -51,9 +47,9 @@ def merge_aug_bboxes_3d(aug_results, img_metas, test_cfg):
 
     # TODO: use a more elegent way to deal with nms
     if test_cfg.use_rotate_nms:
-        nms_func = nms_gpu
+        nms_func = nms_bev
     else:
-        nms_func = nms_normal_gpu
+        nms_func = nms_normal_bev
 
     merged_bboxes = []
     merged_scores = []

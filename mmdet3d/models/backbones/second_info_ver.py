@@ -90,7 +90,6 @@ class SECOND_INFO(BaseModule):
         for block in self.blocks:
             for layer in block:
                 x = layer(x)
-                print(x.size())
                 info.append(x)
             outs.append(x)
         # 计算每一个x之间的信息量差异
