@@ -7,6 +7,8 @@ from torch import nn as nn
 
 from mmdet.models import BACKBONES
 
+import pickle
+import time
 
 @BACKBONES.register_module()
 class SECOND_INFO(BaseModule):
@@ -88,8 +90,12 @@ class SECOND_INFO(BaseModule):
         for block in self.blocks:
             for layer in block:
                 x = layer(x)
+                print(x.size())
                 info.append(x)
             outs.append(x)
         # 计算每一个x之间的信息量差异
         # 计算信息差的增量的方差，作为损失函数。
+        # file = f"/home/yanghaobo/MMDetection3D-Explainable/work_dirs/base_1middle_layer{time.time()}.pickle"
+        # with open(file, "wb") as f:
+        #     pickle.dump(tuple(info),f)
         return tuple(outs), tuple(info)

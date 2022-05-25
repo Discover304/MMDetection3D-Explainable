@@ -256,11 +256,10 @@ class XNet(Base3DDetector):
             if self.with_get_graph_layer:
                 adj_matrix = self.get_graph_layer(feats)
                 fuse_out = self.fusion_layer(feats, adj_matrix)
+                fuse_out = torch.concat(fuse_out, dim=1)
+                # print(f"xnet/fusion_layer: {fuse_out.size()}")
             else:
                 fuse_out = self.fusion_layer(feats)
-                
-            fuse_out = torch.concat(fuse_out, dim=1)
-            # print(f"xnet/fusion_layer: {fuse_out.size()}")
 
             fuse_out = torch.concat((feats, fuse_out), dim=1)
             # print(f"xnet/fusion_layer: {fuse_out.size()}")

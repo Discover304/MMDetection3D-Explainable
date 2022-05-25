@@ -6,6 +6,7 @@ _base_ = [
     '../_base_/default_runtime.py'
     ]
 
+# dag
 data = dict(
     samples_per_gpu=2,
     workers_per_gpu=2)

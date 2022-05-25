@@ -311,7 +311,7 @@ class FusionSummation(nn.Module):
         for i in range(len(adj_matrix)):
             sample = torch.mm(adj_matrix[i] + torch.eye(C, device=adj_matrix.device), feats[i].view(C,-1))/(torch.sum(adj_matrix[i])/C)
             fuse_out.append(torch.cat((feats[i], sample.view(C,H,W)), dim=0))
-        fuse_out = torch.stack(fuse_out, dim=0)
+        # fuse_out = torch.stack(fuse_out, dim=0)
         # print(f"fusion_layer/fuse_out: {fuse_out.size()}")  
 
         return fuse_out

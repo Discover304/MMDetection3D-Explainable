@@ -4,6 +4,7 @@ _base_ = [
 
 model = dict(
     pts_backbone=dict(
+        _delete_=True,
         type='SECOND_INFO',
         in_channels=256,
         layer_nums=[5, 5],

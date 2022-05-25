@@ -7,6 +7,8 @@ from torch import nn as nn
 
 from mmdet.models import BACKBONES
 
+import pickle
+import time
 
 @BACKBONES.register_module()
 class SECOND(BaseModule):
@@ -84,8 +86,26 @@ class SECOND(BaseModule):
         Returns:
             tuple[torch.Tensor]: Multi-scale features.
         """
+        # outs = []
+        # for i in range(len(self.blocks)):
+        #     x = self.blocks[i](x)
+        #     outs.append(x)
+        # return tuple(outs), None
         outs = []
-        for i in range(len(self.blocks)):
-            x = self.blocks[i](x)
+        info = []
+        for block in self.blocks:
+            li = 0
+            for layer in block:
+                x = layer(x)
+                if li%3==2:
+                    info.append(x)
+                    li=0
+                else:
+                    li+=1
             outs.append(x)
+        # 计算每一个x之间的信息量差异
+        # 计算信息差的增量的方差，作为损失函数。
+        # file = f"/home/yanghaobo/MMDetection3D-Explainable/work_dirs/base_middle_layer{time.time()}.pickle"
+        # with open(file, "wb") as f:
+        #     pickle.dump(tuple(info),f)
         return tuple(outs), None

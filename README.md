@@ -54,6 +54,10 @@
 
 将数据集软链接到工作目录下。
 
+```
+ln -/usr/local/mysql/bin/mysql /usr/bin
+```
+
 使用wget下载anaconda，配置运行权限，开始安装。
 
 ```bash

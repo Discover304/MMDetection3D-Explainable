@@ -4,6 +4,14 @@ _base_ = [
     ]
 
 model = dict(
+    pts_backbone=dict(
+        _delete_=True,
+        type='SECOND_INFO',
+        in_channels=256,
+        layer_nums=[5, 5],
+        layer_strides=[1, 2],
+        out_channels=[128, 256]),
+    
     # 图像特征提取 Image Feature Extraction
     img_backbone=dict(
         _delete_=True,
@@ -44,6 +52,10 @@ model = dict(
         type='FusionNeckNN',
         in_channels=512*3,
         out_channels=512),
+    
+    net_loss=dict(
+        _delete_=True,
+        type = 'EntropyLoss'),
     
     pts_bbox_head=dict(
         feat_channels=512)
