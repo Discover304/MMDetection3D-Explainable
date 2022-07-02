@@ -477,6 +477,8 @@ class XNet(Base3DDetector):
 
     def simple_test(self, points, img_metas, img=None, rescale=False):
         """Test function without augmentaiton."""
+        # for i in range(len(points)):
+        #     points[i] = points[i] + (0.1**0.5)*torch.randn(*(points[i].size()), device=points[i].device)
         if not self.with_net_loss:
             img_feats, pts_feats = self.extract_feat(
                 points, img=img, img_metas=img_metas)

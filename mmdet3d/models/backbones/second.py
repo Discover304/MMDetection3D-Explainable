@@ -105,7 +105,7 @@ class SECOND(BaseModule):
             outs.append(x)
         # 计算每一个x之间的信息量差异
         # 计算信息差的增量的方差，作为损失函数。
-        # file = f"/home/yanghaobo/MMDetection3D-Explainable/work_dirs/base_middle_layer{time.time()}.pickle"
+        # file = f"/home/yanghaobo/MMDetection3D-Explainable/work_dirs/result_evaluate_folder/net_info/noise-base_middle_layer{time.time()}.pickle"
         # with open(file, "wb") as f:
         #     pickle.dump(tuple(info),f)
         return tuple(outs), None
