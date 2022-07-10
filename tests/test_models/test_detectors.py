@@ -473,11 +473,11 @@ def test_imvoxelnet():
     assert labels_3d.shape[0] >= 0
 
 
-def test_pointrcnn():
+def test_point_rcnn():
     if not torch.cuda.is_available():
         pytest.skip('test requires GPU and torch+cuda')
     pointrcnn_cfg = _get_detector_cfg(
-        'pointrcnn/pointrcnn_2x8_kitti-3d-3classes.py')
+        'point_rcnn/point_rcnn_2x8_kitti-3d-3classes.py')
     self = build_detector(pointrcnn_cfg).cuda()
     points_0 = torch.rand([1000, 4], device='cuda')
     points_1 = torch.rand([1000, 4], device='cuda')
@@ -539,9 +539,8 @@ def test_smoke():
     attr_labels = None
     img_metas = [
         dict(
-            cam_intrinsic=[[721.5377, 0., 609.5593, 0.],
-                           [0., 721.5377, 172.854, 0.], [0., 0., 1., 0.],
-                           [0., 0., 0., 1.]],
+            cam2img=[[721.5377, 0., 609.5593, 0.], [0., 721.5377, 172.854, 0.],
+                     [0., 0., 1., 0.], [0., 0., 0., 1.]],
             scale_factor=np.array([1., 1., 1., 1.], dtype=np.float32),
             pad_shape=[384, 1280],
             trans_mat=np.array([[0.25, 0., 0.], [0., 0.25, 0], [0., 0., 1.]],
@@ -568,3 +567,42 @@ def test_smoke():
     assert boxes_3d.tensor.shape[1] == 7
     assert scores_3d.shape[0] >= 0
     assert labels_3d.shape[0] >= 0
+
+
+def test_sassd():
+    if not torch.cuda.is_available():
+        pytest.skip('test requires GPU and torch+cuda')
+    _setup_seed(0)
+    sassd_cfg = _get_detector_cfg('sassd/sassd_6x8_80e_kitti-3d-3class.py')
+
+    self = build_detector(sassd_cfg).cuda()
+    points_0 = torch.rand([2010, 4], device='cuda')
+    points_1 = torch.rand([2020, 4], device='cuda')
+    points = [points_0, points_1]
+    gt_bbox_0 = LiDARInstance3DBoxes(torch.rand([10, 7], device='cuda'))
+    gt_bbox_1 = LiDARInstance3DBoxes(torch.rand([10, 7], device='cuda'))
+    gt_bboxes = [gt_bbox_0, gt_bbox_1]
+    gt_labels_0 = torch.randint(0, 3, [10], device='cuda')
+    gt_labels_1 = torch.randint(0, 3, [10], device='cuda')
+    gt_labels = [gt_labels_0, gt_labels_1]
+    img_meta_0 = dict(box_type_3d=LiDARInstance3DBoxes)
+    img_meta_1 = dict(box_type_3d=LiDARInstance3DBoxes)
+    img_metas = [img_meta_0, img_meta_1]
+
+    # test forward_train
+    losses = self.forward_train(points, img_metas, gt_bboxes, gt_labels)
+    assert losses['loss_cls'][0] >= 0
+    assert losses['loss_bbox'][0] >= 0
+    assert losses['loss_dir'][0] >= 0
+    assert losses['aux_loss_cls'][0] >= 0
+    assert losses['aux_loss_reg'][0] >= 0
+
+    # test simple_test
+    with torch.no_grad():
+        results = self.simple_test(points, img_metas)
+    boxes_3d = results[0]['boxes_3d']
+    scores_3d = results[0]['scores_3d']
+    labels_3d = results[0]['labels_3d']
+    assert boxes_3d.tensor.shape == (50, 7)
+    assert scores_3d.shape == torch.Size([50])
+    assert labels_3d.shape == torch.Size([50])

@@ -46,7 +46,11 @@ def build_neck(cfg):
 
 def build_roi_extractor(cfg):
     """Build RoI feature extractor."""
+<<<<<<< HEAD
     if cfg['type'] in NECKS._module_dict.keys():
+=======
+    if cfg['type'] in ROI_EXTRACTORS._module_dict.keys():
+>>>>>>> origin/master
         return ROI_EXTRACTORS.build(cfg)
     else:
         return MMDET_ROI_EXTRACTORS.build(cfg)

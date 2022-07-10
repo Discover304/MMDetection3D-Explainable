@@ -18,8 +18,8 @@ def digit_version(version_str):
     return digit_version
 
 
-mmcv_minimum_version = '1.3.17'
-mmcv_maximum_version = '1.5.0'
+mmcv_minimum_version = '1.4.8'
+mmcv_maximum_version = '1.6.0'
 mmcv_version = digit_version(mmcv.__version__)
 
 
@@ -28,7 +28,7 @@ assert (mmcv_version >= digit_version(mmcv_minimum_version)
     f'MMCV=={mmcv.__version__} is used but incompatible. ' \
     f'Please install mmcv>={mmcv_minimum_version}, <={mmcv_maximum_version}.'
 
-mmdet_minimum_version = '2.19.0'
+mmdet_minimum_version = '2.24.0'
 mmdet_maximum_version = '3.0.0'
 mmdet_version = digit_version(mmdet.__version__)
 assert (mmdet_version >= digit_version(mmdet_minimum_version)

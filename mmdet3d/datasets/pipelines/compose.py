@@ -24,7 +24,12 @@ class Compose:
         self.transforms = []
         for transform in transforms:
             if isinstance(transform, dict):
+<<<<<<< HEAD
                 if transform['type'] in PIPELINES._module_dict.keys():
+=======
+                _, key = PIPELINES.split_scope_key(transform['type'])
+                if key in PIPELINES._module_dict.keys():
+>>>>>>> origin/master
                     transform = build_from_cfg(transform, PIPELINES)
                 else:
                     transform = build_from_cfg(transform, MMDET_PIPELINES)

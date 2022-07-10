@@ -11,11 +11,13 @@ from mmdet3d.core.points import DepthPoints, LiDARPoints
 # yapf: disable
 from mmdet3d.datasets import (AffineResize, BackgroundPointsFilter,
                               GlobalAlignment, GlobalRotScaleTrans,
-                              ObjectNameFilter, ObjectNoise, ObjectRangeFilter,
-                              ObjectSample, PointSample, PointShuffle,
-                              PointsRangeFilter, RandomDropPointsColor,
-                              RandomFlip3D, RandomJitterPoints,
-                              RandomShiftScale, VoxelBasedPointSampler)
+                              MultiViewWrapper, ObjectNameFilter, ObjectNoise,
+                              ObjectRangeFilter, ObjectSample, PointSample,
+                              PointShuffle, PointsRangeFilter,
+                              RandomDropPointsColor, RandomFlip3D,
+                              RandomJitterPoints, RandomRotate,
+                              RandomShiftScale, RangeLimitedRandomCrop,
+                              VoxelBasedPointSampler)
 
 
 def test_remove_points_in_boxes():
@@ -88,7 +90,7 @@ def test_object_sample():
             gt_labels.append(CLASSES.index(cat))
         else:
             gt_labels.append(-1)
-    gt_labels = np.array(gt_labels, dtype=np.long)
+    gt_labels = np.array(gt_labels, dtype=np.int64)
     points = LiDARPoints(points, points_dim=4)
     input_dict = dict(
         points=points, gt_bboxes_3d=gt_bboxes_3d, gt_labels_3d=gt_labels)
@@ -176,7 +178,7 @@ def test_object_name_filter():
             gt_labels.append(CLASSES.index(cat))
         else:
             gt_labels.append(-1)
-    gt_labels = np.array(gt_labels, dtype=np.long)
+    gt_labels = np.array(gt_labels, dtype=np.int64)
     input_dict = dict(
         gt_bboxes_3d=gt_bboxes_3d.clone(), gt_labels_3d=gt_labels.copy())
 
@@ -200,9 +202,9 @@ def test_point_shuffle():
     points = np.fromfile('tests/data/scannet/points/scene0000_00.bin',
                          np.float32).reshape(-1, 6)
     ins_mask = np.fromfile('tests/data/scannet/instance_mask/scene0000_00.bin',
-                           np.long)
+                           np.int64)
     sem_mask = np.fromfile('tests/data/scannet/semantic_mask/scene0000_00.bin',
-                           np.long)
+                           np.int64)
 
     points = DepthPoints(
         points.copy(), points_dim=6, attribute_dims=dict(color=[3, 4, 5]))
@@ -244,9 +246,9 @@ def test_points_range_filter():
     points = np.fromfile('tests/data/scannet/points/scene0000_00.bin',
                          np.float32).reshape(-1, 6)
     ins_mask = np.fromfile('tests/data/scannet/instance_mask/scene0000_00.bin',
-                           np.long)
+                           np.int64)
     sem_mask = np.fromfile('tests/data/scannet/semantic_mask/scene0000_00.bin',
-                           np.long)
+                           np.int64)
 
     points = DepthPoints(
         points.copy(), points_dim=6, attribute_dims=dict(color=[3, 4, 5]))
@@ -286,7 +288,7 @@ def test_object_range_filter():
          [18.7314, -18.559, 20.6547, 6.4800, 8.6000, 3.9200, -1.0100],
          [3.7314, 42.559, -0.6547, 6.4800, 8.6000, 2.9200, 3.0100]])
     gt_bboxes_3d = LiDARInstance3DBoxes(bbox, origin=(0.5, 0.5, 0.5))
-    gt_labels_3d = np.array([0, 2, 1, 1, 2, 0], dtype=np.long)
+    gt_labels_3d = np.array([0, 2, 1, 1, 2, 0], dtype=np.int64)
 
     input_dict = dict(
         gt_bboxes_3d=gt_bboxes_3d.clone(), gt_labels_3d=gt_labels_3d.copy())
@@ -850,3 +852,60 @@ def test_random_shift_scale():
     assert results['center'].dtype == np.float32
     assert results['size'].dtype == np.float32
     assert 'affine_aug' in results
+
+
+def test_range_limited_random_crop():
+    random_crop = RangeLimitedRandomCrop(relative_y_offset_range=(0.3, 1.0),
+                                         relative_x_offset_range=(0.5, 0.7),
+                                         crop_size=(256, 704))
+    results = dict()
+    img = mmcv.imread('./tests/data/kitti/training/image_2/000000.png',
+                      'color')
+    results['img'] = img
+    results = random_crop(results)
+    assert results['img'].shape == (256, 704, 3)
+    assert 'crop' in results
+
+
+def test_random_rotate():
+    random_rotate = RandomRotate(range=(-5.4, 5.4),
+                                 img_fill_val=0, level=1, prob=1.0)
+    results = dict()
+    img = mmcv.imread('./tests/data/kitti/training/image_2/000000.png',
+                      'color')
+    results['img'] = img
+    angle_origin = random_rotate.angle
+    results = random_rotate(results)
+    assert random_rotate.angle != angle_origin
+    assert 'rotate' in results
+
+
+def test_multiview_wrapper():
+    img_norm_cfg = dict(mean=[123.675, 116.28, 103.53],
+                        std=[58.395, 57.12, 57.375], to_rgb=True)
+    collected_keys = ['scale_factor', 'crop', 'pad_shape', 'flip', 'rotate']
+    multiview_transform_pipeline = \
+        MultiViewWrapper(transforms=[dict(type='Resize',
+                                          ratio_range=(0.94, 1.11),
+                                          img_scale=(396, 704)),
+                                     dict(type='RangeLimitedRandomCrop',
+                                          relative_x_offset_range=(0.0, 1.0),
+                                          relative_y_offset_range=(1.0, 1.0),
+                                          crop_size=(256, 704)),
+                                     dict(type='Pad', size=(256, 704)),
+                                     dict(type='RandomFlip', flip_ratio=0.5),
+                                     dict(type='RandomRotate',
+                                          range=(-5.4, 5.4), img_fill_val=0,
+                                          level=1, prob=1.0),
+                                     dict(type='Normalize', **img_norm_cfg)],
+                         collected_keys=collected_keys)
+    results = dict()
+    img = mmcv.imread('./tests/data/kitti/training/image_2/000000.png',
+                      'color')
+    results['img'] = [img, img]
+    num_imgs = len(results['img'])
+    results = multiview_transform_pipeline(results)
+    assert len(results['img']) == num_imgs
+    for key in collected_keys:
+        assert key in results
+        assert len(results[key]) == num_imgs

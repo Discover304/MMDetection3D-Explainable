@@ -1,7 +1,9 @@
 ARG PYTORCH="1.6.0"
 ARG CUDA="10.1"
 ARG CUDNN="7"
-
+ARG MMCV="1.5.0"
+ARG MMDET="2.19.0"
+ARG MMSEG="0.20.0"
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
 
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
